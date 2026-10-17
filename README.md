@@ -17,11 +17,11 @@ This is an independent third-party project, unaffiliated with OpenAI.
 
 ## Choose a connection mode
 
-| | Simple | Full MCP |
-| --- | --- | --- |
-| Best for | Trying model responses with minimal setup | ChatGPT models calling Codex tools |
-| Tool integration | Tool instructions are passed as text | Tool calls use a custom ChatGPT plugin and Secure MCP Tunnel |
-| Extra setup | No custom plugin or Tunnel | Plugin access, Tunnel permissions and compatible tunnel-client |
+|                  | Simple                                    | Full MCP                                                       |
+| ---------------- | ----------------------------------------- | -------------------------------------------------------------- |
+| Best for         | Trying model responses with minimal setup | ChatGPT models calling Codex tools                             |
+| Tool integration | Tool instructions are passed as text      | Tool calls use a custom ChatGPT plugin and Secure MCP Tunnel   |
+| Extra setup      | No custom plugin or Tunnel                | Plugin access, Tunnel permissions and compatible tunnel-client |
 
 Start with **Simple** to try Bridge. Choose **Full MCP** when you need
 actual tool calls and your account and workspace support the required connector.
