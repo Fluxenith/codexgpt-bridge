@@ -36,9 +36,12 @@ macOS uses a DMG and Linux uses an AppImage or DEB.
 
 You need Codex and a ChatGPT account with access to the models you want to use.
 Available models and usage limits depend on your account.
-Bridge depends on the ChatGPT Web interface, which may change. Review the
-applicable service terms and account requirements before use. Bridge does not
-guarantee continuous access or bypass account usage limits.
+Bridge automates a signed-in ChatGPT Web session and depends on an interface
+that may change. OpenAI's [Terms of Use](https://openai.com/policies/terms-of-use/)
+prohibit automatic or programmatic extraction of data or Output and
+circumventing rate limits. This integration may conflict with applicable terms;
+confirm that your use is authorized before trying it. Bridge cannot guarantee
+account safety, continuous access, or additional usage allowance.
 
 ## Get started
 
@@ -56,12 +59,15 @@ previously managed by Bridge.
 The interface supports English, Traditional Chinese, Simplified Chinese,
 Japanese and Korean. Use the **Language** menu to switch.
 
-With Full MCP and a Pro account, GPT-5.6 Sol and GPT-6 Sol Medium, High and Extra High use a
-240,000-token context window and compact at about 220,000 tokens. Large initial
-payloads are staged with exact acknowledgements while each browser message keeps
-its existing limit. Each model's Instant is a separate option with a 111,193-token
-context window and compaction at about 95,000 tokens. Public model commentary appears during long Full tasks and is retained
-across reconnects without repeating commentary already delivered to Codex.
+Bridge's current Full MCP routes advertise a 240,000-token context budget for
+supported GPT-5.6 Sol and GPT-6 Sol Medium, High and Extra High options, with
+compaction at about 220,000 tokens. The separate Instant options advertise
+111,193 tokens, with compaction at about 95,000. These are Bridge routing
+settings, not a guarantee of the model's actual context capacity or account
+entitlement; Pro alone does not establish custom connector or Tunnel access.
+Large initial payloads are staged with acknowledgements, while each browser
+message retains its own limit. Public model commentary can appear during long
+Full tasks and is retained across reconnects without duplicate delivery.
 
 ## ChatGPT plugin setup
 
@@ -181,7 +187,7 @@ The GitHub release workflow bundles this repository's update feed into installer
 so users do not need to enter an update URL.
 Bridge checks for new versions at startup and in the background. Updates require
 an accessible release feed and installer; until that feed is available, download
-new versions from **[Releases](https://github.com/chrisfluxx/codexgpt-bridge/releases/latest)**.
+new versions from **[Releases](https://github.com/Fluxenith/codexgpt-bridge/releases/latest)**.
 
 If the connection fails, check your ChatGPT login and use Bridge's **Doctor**
 diagnostics. Include your app version, operating system and steps to reproduce
