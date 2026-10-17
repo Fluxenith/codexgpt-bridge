@@ -34,8 +34,11 @@ Linux 使用 AppImage 或 DEB。
 
 你需要已安裝的 Codex，以及可使用所需模型的 ChatGPT 帳號。
 可用模型與使用額度依帳號而定。
-Bridge 依賴 ChatGPT 網頁介面，介面變動可能影響運作。使用前請確認
-相關服務條款與帳號條件；Bridge 不保證連線不中斷，也不會解除使用額度限制。
+Bridge 會自動操作已登入的 ChatGPT 網頁，介面變動可能影響運作。
+OpenAI 的[使用條款](https://openai.com/policies/terms-of-use/)禁止自動或程式化擷取
+資料／輸出，以及規避速率限制。此整合方式可能與適用條款衝突；
+使用前請先確認已獲准使用。Bridge 不保證帳號不受限制、連線不中斷，
+也不會解除使用額度限制。
 
 ## 開始使用
 
@@ -51,11 +54,13 @@ Bridge 依賴 ChatGPT 網頁介面，介面變動可能影響運作。使用前�
 
 介面支援英文、繁體中文、簡體中文、日文與韓文，可從「語言」選單切換。
 
-Full MCP 搭配 Pro 帳號時，GPT-5.6 Sol 與 GPT-6 Sol 的 Medium、High 與 Extra High 使用
-240,000 token 上下文，約在 220,000 token 壓縮。較大的初始內容會分段載入並逐段
-核對確認訊息，每則瀏覽器訊息仍遵守原本的上限。兩者的 Instant 都列為獨立選項，
-保留 111,193 token 上下文並在約 95,000 token 壓縮。長任務可顯示模型公開的中途進度；斷線續接時保留進度，且不重複
-已交付 Codex 的訊息。
+Bridge 目前的 Full MCP 路由，對支援的 GPT-5.6 Sol 與 GPT-6 Sol Medium、
+High、Extra High 選項設定 240,000 token 的上下文預算，約在 220,000 token
+壓縮；獨立的 Instant 選項設定 111,193 token，約在 95,000 token 壓縮。
+這些是 Bridge 的路由設定，並非模型實際上下文容量或帳號權限的保證；
+僅有 Pro 訂閱不代表具備自訂連接器與 Tunnel 權限。較大的初始內容會分段載入、
+逐段核對確認訊息，每則瀏覽器訊息仍遵守原本上限。長任務可顯示模型公開的
+中途進度；斷線續接時保留進度，且不重複已交付 Codex 的訊息。
 
 ## ChatGPT 外掛設定
 
@@ -171,7 +176,7 @@ v0.1.94 使用 client 的 `runtimes connect` 功能；若遇到未知子命令�
 GitHub 發布流程會將此倉庫的更新網址內建至安裝包，使用者不需手動設定。
 Bridge 會在啟動與背景執行期間
 檢查新版；線上更新需要可存取的更新清單與安裝檔。更新來源尚未可用時，
-請從 **[Releases](https://github.com/chrisfluxx/codexgpt-bridge/releases/latest)** 下載新版。
+請從 **[Releases](https://github.com/Fluxenith/codexgpt-bridge/releases/latest)** 下載新版。
 
 連線失敗時，先確認 ChatGPT 登入狀態，再執行 Bridge 的「Doctor」。
 回報問題時請附上程式版本、作業系統與重現步驟，並移除帳號資料、
