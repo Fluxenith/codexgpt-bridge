@@ -1,4 +1,4 @@
-import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import { access, copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath, URL } from "node:url";
 import { join } from "node:path";
 import process from "node:process";
@@ -15,8 +15,17 @@ const productName = "CodexGPT Bridge Installer Smoke";
 const appId = "io.codexgpt.bridge.installer-smoke";
 const output = join(projectDir, "release", "installer-smoke");
 const installerName = `CodexGPT-Bridge-Setup-${metadata.version}.exe`;
+const prepackaged = join(projectDir, "release", "win-unpacked");
+await access(join(prepackaged, "CodexGPT Bridge.exe")).catch(() => {
+  throw new Error(
+    "Installer smoke requires release/win-unpacked; run pnpm package:win:dir first.",
+  );
+});
 const buildOptions = {
   projectDir,
+  // Reuse the app already built by CI. Packaging again can hit Windows file
+  // scanner locks while copying Electron's LICENSES.chromium.html.
+  prepackaged,
   targets: Platform.WINDOWS.createTarget(["nsis"], Arch.x64),
   publish: "never",
   config: {
