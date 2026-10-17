@@ -1,24 +1,41 @@
 # CodexGPT Bridge
 
-**把 ChatGPT 網頁模型接入 Codex。**
+**在 Codex 使用你 ChatGPT 帳號可用的網頁模型。**
 
 [English](README.md) · [繁體中文](README.zh-TW.md) · [简体中文](README.zh-CN.md) · [日本語](README.ja.md) · [한국어](README.ko.md)
 
-CodexGPT Bridge 連接 Codex 與你已登入的 ChatGPT 網頁，支援模型選擇、
-任務各自保留對話、圖片、進度顯示與取消。專案檔案、工具與核准由 Codex 管理。
+**[下載 Windows、macOS 或 Linux 安裝檔](https://github.com/Fluxenith/codexgpt-bridge/releases/latest)** ·
+**[快速開始](#開始使用)** ·
+**[回報試用結果](https://github.com/Fluxenith/codexgpt-bridge/issues/new?template=early_tester_feedback.md)**
+
+CodexGPT Bridge 連接 Codex 與你已登入的 ChatGPT 網頁。你可以在 Codex
+選擇帳號可用的網頁模型，並由 Codex 管理專案檔案、工具與核准。
+Bridge 支援每個任務獨立對話、圖片、進度顯示與取消。
 
 本專案為獨立第三方專案，與 OpenAI 沒有隸屬關係。
 
-要設定 GPT 外掛，請看下方的 **[ChatGPT 外掛設定](#chatgpt-外掛設定)**。
+## 選擇連線模式
+
+| | Simple | Full MCP |
+| --- | --- | --- |
+| 適合 | 快速試用模型回覆 | 需要模型透過連接器呼叫 Codex 工具 |
+| 工具運作 | 以文字傳遞工具指令 | 使用 ChatGPT 自訂外掛與 Secure MCP Tunnel |
+| 額外設定 | 不需要自訂外掛或 Tunnel | 需要外掛權限、Tunnel 權限與相容的 tunnel-client |
+
+建議初次先用 **Simple** 測試。如果帳號與工作區具備權限，
+且需要真正的工具呼叫，再設定 **Full MCP**。
+詳細步驟請看 **[ChatGPT 外掛設定](#chatgpt-外掛設定)**。
 
 ## 安裝
 
-從本倉庫的 **[Releases](https://github.com/chrisfluxx/codexgpt-bridge/releases/latest)** 頁面下載適合你作業系統的安裝檔。
+從本倉庫的 **[Releases](https://github.com/Fluxenith/codexgpt-bridge/releases/latest)** 頁面下載適合你作業系統的安裝檔。
 Windows 使用 `CodexGPT-Bridge-Setup-<版本>.exe`；macOS 使用 DMG；
 Linux 使用 AppImage 或 DEB。
 
 你需要已安裝的 Codex，以及可使用所需模型的 ChatGPT 帳號。
 可用模型與使用額度依帳號而定。
+Bridge 依賴 ChatGPT 網頁介面，介面變動可能影響運作。使用前請確認
+相關服務條款與帳號條件；Bridge 不保證連線不中斷，也不會解除使用額度限制。
 
 ## 開始使用
 
@@ -161,6 +178,13 @@ Bridge 會在啟動與背景執行期間
 私人路徑、對話內容與憑證。
 
 登入資料與設定儲存在應用程式的本機使用者設定檔。
+
+## 協助測試 Bridge
+
+Bridge 還在早期階段。如果你願意試用，歡迎
+**[提供測試回饋](https://github.com/Fluxenith/codexgpt-bridge/issues/new?template=early_tester_feedback.md)**：
+請註明作業系統、連線模式、能否完成設定，以及是否成功在 Codex
+執行一個小任務。請勿附上憑證、Cookie、私人程式碼、個人對話及帳號識別資訊。
 
 ## 從原始碼啟動
 

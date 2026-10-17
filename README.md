@@ -1,26 +1,44 @@
 # CodexGPT Bridge
 
-**Bring ChatGPT Web models into Codex.**
+**Use ChatGPT Web models available to your account inside Codex.**
 
 [English](README.md) · [繁體中文](README.zh-TW.md) · [简体中文](README.zh-CN.md) · [日本語](README.ja.md) · [한국어](README.ko.md)
 
-CodexGPT Bridge connects Codex to your signed-in ChatGPT Web session. It supports
-model selection, separate task conversations, images, progress and cancellation.
-Codex handles project files, tools and approvals.
+**[Download for Windows, macOS or Linux](https://github.com/Fluxenith/codexgpt-bridge/releases/latest)** ·
+**[Quick start](#get-started)** ·
+**[Early-tester feedback](https://github.com/Fluxenith/codexgpt-bridge/issues/new?template=early_tester_feedback.md)**
+
+CodexGPT Bridge connects your signed-in ChatGPT Web session to Codex. Choose
+available Web models inside Codex while Codex handles project files, tools and
+approvals. Bridge supports separate task conversations, images, progress
+updates and cancellation.
 
 This is an independent third-party project, unaffiliated with OpenAI.
 
-For GPT plugin configuration, see **[ChatGPT plugin setup](#chatgpt-plugin-setup)**
-or the **[繁體中文設定教學](README.zh-TW.md#chatgpt-外掛設定)**.
+## Choose a connection mode
+
+| | Simple | Full MCP |
+| --- | --- | --- |
+| Best for | Trying model responses with minimal setup | ChatGPT models calling Codex tools |
+| Tool integration | Tool instructions are passed as text | Tool calls use a custom ChatGPT plugin and Secure MCP Tunnel |
+| Extra setup | No custom plugin or Tunnel | Plugin access, Tunnel permissions and compatible tunnel-client |
+
+Start with **Simple** to try Bridge. Choose **Full MCP** when you need
+actual tool calls and your account and workspace support the required connector.
+See **[ChatGPT plugin setup](#chatgpt-plugin-setup)** or the
+**[繁體中文設定教學](README.zh-TW.md#chatgpt-外掛設定)**.
 
 ## Install
 
 Download the installer for your operating system from this repository's
-**[Releases](https://github.com/chrisfluxx/codexgpt-bridge/releases/latest)** page. Windows uses the `CodexGPT-Bridge-Setup-<version>.exe` installer;
+**[Releases](https://github.com/Fluxenith/codexgpt-bridge/releases/latest)** page. Windows uses the `CodexGPT-Bridge-Setup-<version>.exe` installer;
 macOS uses a DMG and Linux uses an AppImage or DEB.
 
 You need Codex and a ChatGPT account with access to the models you want to use.
 Available models and usage limits depend on your account.
+Bridge depends on the ChatGPT Web interface, which may change. Review the
+applicable service terms and account requirements before use. Bridge does not
+guarantee continuous access or bypass account usage limits.
 
 ## Get started
 
@@ -171,6 +189,14 @@ when reporting a problem. Remove account details, private paths, conversation
 contents and credentials from reports.
 
 Login data and settings remain in the application's local user profile.
+
+## Help test Bridge
+
+Bridge is an early project. If you try it, please
+**[share early-tester feedback](https://github.com/Fluxenith/codexgpt-bridge/issues/new?template=early_tester_feedback.md)**:
+your operating system, connection mode, whether setup succeeded, and whether
+a small Codex task worked. Please omit credentials, cookies, private code,
+personal conversation content and identifying account information.
 
 ## Build from source
 
