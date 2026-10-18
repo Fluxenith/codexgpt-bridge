@@ -215,8 +215,100 @@ try {
   assert.doesNotMatch(removed, /model_catalog_json/u);
   assert.doesNotMatch(removed, /CodexGPT Bridge managed Interrupt hook/u);
   assert.ok(removed.includes(userHook));
+  for (const action of ["repair", "install"]) {
+    await page.evaluate(() => globalThis.codexgptBridge.installWebProvider());
+    const beforeReset = await readFile(configPath, "utf8");
+    const beforeJournal = await readFile(
+      join(profile, "codex-provider-integration.json"),
+      "utf8",
+    );
+    const stale = JSON.parse(beforeJournal);
+    const detached = beforeReset
+      .replace(stale.interruptHook.fragment, "")
+      .replace(
+        /# >>> CodexGPT Bridge managed Web provider[\s\S]*?# <<< CodexGPT Bridge managed Web provider\r?\n/u,
+        `openai_base_url = "http://127.0.0.1:17841/${action}/v1"\n` +
+          'model_catalog_json = "current-user-catalog.json"\n',
+      );
+    assert.notEqual(detached, beforeReset);
+    await writeFile(configPath, detached);
+    await page
+      .getByRole("button", { name: "Repair connection", exact: true })
+      .waitFor();
+    const status = await page.evaluate(() =>
+      globalThis.codexgptBridge.getWebProviderStatus(),
+    );
+    assert.equal(status.installed, false);
+    assert.equal(status.repairable, true);
+    if (action === "repair") {
+      const catalog = await readFile(stale.catalogPath, "utf8");
+      await writeFile(stale.catalogPath, catalog + "\n");
+      assert.equal(
+        (
+          await page.evaluate(() =>
+            globalThis.codexgptBridge.getWebProviderStatus(),
+          )
+        ).repairable,
+        false,
+      );
+      await assert.rejects(
+        page.evaluate(() => globalThis.codexgptBridge.repairWebProvider()),
+        /catalog changed after setup/u,
+      );
+      assert.equal(await readFile(configPath, "utf8"), detached);
+      assert.equal(
+        await readFile(
+          join(profile, "codex-provider-integration.json"),
+          "utf8",
+        ),
+        beforeJournal,
+      );
+      await writeFile(stale.catalogPath, catalog);
+      await page
+        .getByRole("button", { name: "Repair connection", exact: true })
+        .waitFor();
+      await page
+        .getByRole("button", { name: "Repair connection", exact: true })
+        .click();
+    } else {
+      await page.evaluate(() => globalThis.codexgptBridge.installWebProvider());
+    }
+    await page
+      .getByRole("button", { name: "Remove Web models", exact: true })
+      .waitFor();
+    assert.equal(
+      (
+        await page.evaluate(() =>
+          globalThis.codexgptBridge.getWebProviderStatus(),
+        )
+      ).installed,
+      true,
+    );
+    const restoredJournal = JSON.parse(
+      await readFile(join(profile, "codex-provider-integration.json"), "utf8"),
+    );
+    assert.equal(
+      restoredJournal.upstreamBaseUrl,
+      `http://127.0.0.1:17841/${action}/v1`,
+    );
+    assert.equal(restoredJournal.interruptHook.groupIndex, 1);
+    const backups = await readdir(join(profile, "provider-backups"));
+    assert.ok(
+      (
+        await Promise.all(
+          backups
+            .filter((name) => name.endsWith(".config.toml"))
+            .map((name) =>
+              readFile(join(profile, "provider-backups", name), "utf8"),
+            ),
+        )
+      ).includes(detached),
+    );
+    await page.evaluate(() => globalThis.codexgptBridge.removeWebProvider());
+    assert.equal(await readFile(configPath, "utf8"), detached);
+  }
   process.stdout.write(
-    "Provider repair E2E passed: rebased hook recognized, visible repair, route restored, exact backup, other hook, voice and model preserved after uninstall.\n",
+    "Provider repair E2E passed: missing hook and fully removed provider repaired, changed catalog rejected, current settings restored exactly, backups and user hooks preserved.\n",
   );
 } catch (error) {
   const page = application?.windows()[0];

@@ -52,6 +52,7 @@ import { parseChatGptProjectSettings } from "./chatgpt-projects.js";
 import { discoverCodexCliExecutables } from "./codex-cli.js";
 import { WebOnlyIntegration } from "./web-only-integration.js";
 import {
+  isCodexProviderFullyDetached,
   planProviderRepair,
   type ProviderRepairPlan,
 } from "./provider-repair.js";
@@ -1192,6 +1193,20 @@ async function codexProviderInstalledStatus(): Promise<{
     catalogMatches &&
     hookMatches;
   if (installed) return { installed, configPath };
+  if (
+    journal.version === 5 &&
+    configPath === codexConfigPath() &&
+    catalogMatches &&
+    isCodexProviderFullyDetached(config.text, journal)
+  ) {
+    return {
+      installed: false,
+      configPath,
+      repairable: true,
+      error:
+        "The Bridge provider settings and Interrupt hook were removed. Click Repair connection to reinstall them while saving the current provider settings, then restart Codex.",
+    };
+  }
   let repairable = false;
   if (
     hasManagedProviderCatalog(journal) &&
@@ -1230,8 +1245,16 @@ async function installCodexWebProvider(repair = false): Promise<void> {
     throw new Error("The Web provider failed to start.");
   const configPath = codexConfigPath();
   const config = await readTextIfPresent(configPath);
-  const journal = await loadCodexProviderIntegrationJournal();
+  const previousJournal = await loadCodexProviderIntegrationJournal();
   const providerConfigText = config.text;
+  const reinstallingDetachedProvider =
+    previousJournal?.version === 5 &&
+    previousJournal.configPath === configPath &&
+    config.exists &&
+    isCodexProviderFullyDetached(providerConfigText, previousJournal);
+  // Treat fully removed settings as a new install so removal restores today's
+  // provider assignments, rather than those recorded before the config reset.
+  const journal = reinstallingDetachedProvider ? undefined : previousJournal;
   let repairingMissingHook = false;
   if (journal?.version === 5) {
     repairingMissingHook = isCodexInterruptHookFullyAbsent(
@@ -1305,10 +1328,26 @@ async function installCodexWebProvider(repair = false): Promise<void> {
     );
   }
 
+  if (
+    reinstallingDetachedProvider &&
+    hasManagedProviderCatalog(previousJournal)
+  ) {
+    const currentCatalog = await readTextIfPresent(previousJournal.catalogPath);
+    if (
+      !currentCatalog.exists ||
+      sha256(currentCatalog.text) !== previousJournal.catalogHash
+    ) {
+      throw new Error(
+        "Codex Web model catalog changed after setup; refusing to overwrite the user's newer value.",
+      );
+    }
+  }
+
   // Repair does not need to rebuild an unchanged model catalog or invoke the CLI.
   const catalog =
-    (repairPlan || repairingMissingHook) && hasManagedProviderCatalog(journal)
-      ? { path: journal.catalogPath, hash: journal.catalogHash }
+    (repairPlan || repairingMissingHook || reinstallingDetachedProvider) &&
+    hasManagedProviderCatalog(previousJournal)
+      ? { path: previousJournal.catalogPath, hash: previousJournal.catalogHash }
       : await writeManagedModelCatalog(await probeSupportedBridgeModes());
   const lineEnding = lineEndingFor(providerConfigText);
   const nextBlock = managedProviderBlock(baseUrl, catalog.path, lineEnding);
@@ -1373,7 +1412,7 @@ async function installCodexWebProvider(repair = false): Promise<void> {
     nextText = `${nextBlock}${stripped}`;
   }
 
-  if (repairPlan || repairingMissingHook) {
+  if (repairPlan || repairingMissingHook || reinstallingDetachedProvider) {
     const backupDirectory = join(app.getPath("userData"), "provider-backups");
     const suffix = new Date().toISOString().replace(/[:.]/gu, "-");
     await atomicWriteText(
@@ -1382,7 +1421,7 @@ async function installCodexWebProvider(repair = false): Promise<void> {
     );
     await atomicWriteText(
       join(backupDirectory, `${suffix}.journal.json`),
-      JSON.stringify(journal, null, 2) + "\n",
+      JSON.stringify(previousJournal, null, 2) + "\n",
     );
   }
   const latestConfig = await readTextIfPresent(configPath);

@@ -910,9 +910,11 @@ export function App() {
                 name="tunnelClientPath"
                 key={`client-${settings.fullMcpTunnelClientPath ?? ""}`}
                 defaultValue={settings.fullMcpTunnelClientPath ?? ""}
-                placeholder={t("autoDetected")}
+                placeholder={t("tunnelClientAutomatic")}
+                aria-describedby="full-mcp-client-help"
               />
             </div>
+            <p id="full-mcp-client-help">{t("tunnelClientHelp")}</p>
           </details>
           <button className="secondary" disabled={busy} type="submit">
             {t("apply")}

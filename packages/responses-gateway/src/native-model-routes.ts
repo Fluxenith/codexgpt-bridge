@@ -13,7 +13,7 @@ const modes: Record<BridgeNativeEffort, BridgeWebMode> = {
   max: "pro",
 };
 const solEfforts = ["low", "medium", "high", "xhigh"] as const;
-const nativeRoutes: readonly BridgeWebModelRoute[] = [
+export const BRIDGE_NATIVE_MODEL_ROUTES: readonly BridgeWebModelRoute[] = [
   {
     slug: "codexgpt-bridge/gpt-6-sol",
     displayName: "GPT-6 Sol · Bridge",
@@ -109,19 +109,6 @@ const nativeRoutes: readonly BridgeWebModelRoute[] = [
     supportedEfforts: ["low", "medium"],
   },
 ];
-export const BRIDGE_NATIVE_MODEL_ROUTES: readonly BridgeWebModelRoute[] = [
-  ...nativeRoutes,
-  ...nativeRoutes
-    .filter((route) => route.nativeFamily)
-    .map((route): BridgeWebModelRoute => ({
-      ...route,
-      slug: `${route.slug}-3x`,
-      displayName: `${route.displayName} · 3× context`,
-      description: `${route.description} Ordered Full context transport using at most six browser messages.`,
-      contextMultiplier: 3,
-    })),
-];
-
 export function nativeRouteMode(
   route: BridgeWebModelRoute,
   effort: string,
@@ -141,21 +128,22 @@ export function availableNativeModelRoutes(
   if (!enabled || profile === "compatibility") return [];
   const available = availableModes ? new Set(availableModes) : undefined;
   return BRIDGE_NATIVE_MODEL_ROUTES.flatMap((route) => {
-    // Simple can pin an exact browser model, but cannot run the Full-only
-    // staged-context transaction or Luna's private checkpoint protocol.
+    // Luna requires the Full-only private checkpoint protocol.
+    if (enabled === "simple" && route.slug === "codexgpt-bridge/luna-native")
+      return [];
+    // A missing capability snapshot cannot prove that Luna/Think exists.
     if (
-      enabled === "simple" &&
-      (route.contextMultiplier || route.slug === "codexgpt-bridge/luna-native")
+      route.slug === "codexgpt-bridge/luna-native" &&
+      (!available || (!available.has("luna") && !available.has("think")))
     )
       return [];
     if (route.nativeFamily && !families.includes(route.nativeFamily)) return [];
     if (route.mode === "pro" && profile !== "pro") return [];
     if (
-      /-instant(?:-3x)?$/.test(route.slug) &&
+      /-instant$/.test(route.slug) &&
       profile === "pro" &&
       (enabled !== true ||
-        (route.nativeFamily !== "6" && route.nativeFamily !== "5.6") ||
-        route.contextMultiplier)
+        (route.nativeFamily !== "6" && route.nativeFamily !== "5.6"))
     )
       return [];
     const candidate: BridgeWebModelRoute = {

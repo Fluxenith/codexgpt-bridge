@@ -52,6 +52,9 @@ const page = `<!doctype html><style>
   };
 </script>`;
 
+let staleShellServed = false;
+let recoveredShell = false;
+const staleShell = process.argv.includes("--stale-login-shell");
 const server = createServer((request, response) => {
   if (request.url === "/api/auth/session") {
     response.setHeader("Content-Type", "application/json");
@@ -59,6 +62,16 @@ const server = createServer((request, response) => {
     return;
   }
   response.setHeader("Content-Type", "text/html; charset=utf-8");
+  if (staleShell && request.url.includes("temporary-chat=true")) {
+    if (!staleShellServed) {
+      staleShellServed = true;
+      response.end(
+        '<!doctype html><div id="web-mobile-root"><a href="/?noauth_recent_chat_failed=1">Login</a><main><textarea id="mobile-composer-prompt"></textarea></main></div>',
+      );
+      return;
+    }
+    recoveredShell = true;
+  }
   response.end(page);
 });
 
@@ -118,6 +131,14 @@ try {
   assert.equal(result.ok, true);
   assert.equal(result.mode, "high");
   assert.equal(result.response, "CODEX WEB GPT READY");
+  if (staleShell) {
+    assert.equal(staleShellServed, true);
+    assert.equal(
+      recoveredShell,
+      true,
+      "fresh signed-out shell must be reloaded before sending",
+    );
+  }
   assert.deepEqual(
     result.checks.map((check) => check.id),
     [

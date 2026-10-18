@@ -12,11 +12,18 @@ CodexGPT Bridge は Codex を、ログイン済みの ChatGPT Web セッショ�
 
 GPT プラグインと Full MCP の設定手順：[English](README.md#chatgpt-plugin-setup) · [繁體中文](README.zh-TW.md#chatgpt-外掛設定)。
 
+**v0.1.103:** Full MCP の公式 Tunnel クライアントを自動でダウンロードして検証できます。パスは空欄のままで利用できます。Tunnel の認証情報とプラグインの権限は引き続き必要です。
+
 ## インストール
 
-このリポジトリの **[Releases](https://github.com/chrisfluxx/codexgpt-bridge/releases/latest)** ページから、OS に対応するインストーラーをダウンロードしてください。
+このリポジトリの **[Releases](https://github.com/Fluxenith/codexgpt-bridge/releases/latest)** ページから、OS に対応するインストーラーをダウンロードしてください。
 Windows は `CodexGPT-Bridge-Setup-<バージョン>.exe`、macOS は DMG、
 Linux は AppImage または DEB を使用します。
+
+**macOS テスト版：** Intel／Apple Silicon 版は Apple の公証を受けていません。
+初回起動を試した後、「システム設定 → プライバシーとセキュリティ → このまま開く」
+で許可が必要になる場合があります。配布元を信頼できる場合のみ許可してください。
+[Apple の説明](https://support.apple.com/ja-jp/102445)を参照してください。
 
 Codex がインストールされており、使用するモデルにアクセスできる ChatGPT アカウントが必要です。
 利用できるモデルと使用量の上限はアカウントによって異なります。
@@ -43,7 +50,7 @@ GitHub のリリースワークフローは、このリポジトリの更新 URL
 ユーザーが更新 URL を入力する必要はありません。
 Bridge は起動時とバックグラウンドで新しいバージョンを確認します。
 オンライン更新にはアクセス可能な更新マニフェストとインストーラーが必要です。
-更新元がまだ利用できない場合は、**[Releases](https://github.com/chrisfluxx/codexgpt-bridge/releases/latest)** から新しいバージョンをダウンロードしてください。
+更新元がまだ利用できない場合は、**[Releases](https://github.com/Fluxenith/codexgpt-bridge/releases/latest)** から新しいバージョンをダウンロードしてください。
 
 接続に失敗した場合は、ChatGPT のログイン状態を確認してから Bridge の **Doctor** 診断を実行してください。
 問題を報告する際は、アプリのバージョン、OS、再現手順を記載し、
@@ -63,4 +70,4 @@ pnpm desktop
 ## サードパーティーのライセンス
 
 依存パッケージのライセンスは [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt)
-と `LICENSES/` に記載されています。本プロジェクトのライセンスはまだ選択されていません。
+と `LICENSES/` に記載されています。本プロジェクトは [MIT ライセンス](LICENSE) の下で公開されています。

@@ -35,14 +35,22 @@ describe("OpenAI Tunnel status", () => {
       delete process.env.CODEXGPT_BRIDGE_TUNNEL_CLIENT;
 
       const calls: string[] = [];
-      const manager = new TunnelManager(root, async (executable) => {
-        calls.push(executable);
-        return {
-          status: 0,
-          stdout: '{"running":true,"healthy":true,"ready":true}',
-          stderr: "",
-        };
-      });
+      let installations = 0;
+      const manager = new TunnelManager(
+        root,
+        async (executable) => {
+          calls.push(executable);
+          return {
+            status: 0,
+            stdout: '{"running":true,"healthy":true,"ready":true}',
+            stderr: "",
+          };
+        },
+        async () => {
+          installations += 1;
+          return configuredBinary;
+        },
+      );
       const settings = {
         tunnelId: "tunnel_0123456789abcdef0123456789abcdef",
         runtimeKeyFile: key,
@@ -66,6 +74,12 @@ describe("OpenAI Tunnel status", () => {
       await connect();
       assert.ok(calls.every((binary) => binary === environmentBinary));
       await connect(configuredBinary);
+      assert.ok(calls.every((binary) => binary === configuredBinary));
+      assert.equal(installations, 0);
+      delete process.env.CODEXGPT_BRIDGE_TUNNEL_CLIENT;
+      await rm(defaultBinary);
+      await connect();
+      assert.equal(installations, 1);
       assert.ok(calls.every((binary) => binary === configuredBinary));
     } finally {
       for (const [key, value] of savedEnvironment) {

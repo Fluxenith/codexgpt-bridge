@@ -86,17 +86,12 @@ it("separates standard account modes, Pro account modes, and the current bounded
 it("stages verified GPT-5.6 and GPT-6 Full reasoning context while retaining bounded messages and Instant routes", () => {
   const modes = ["instant", "medium", "high", "extra-high", "pro"] as const;
   const full = availableNativeModelRoutes(modes, "pro", ["5.6", "6"]);
-  for (const slug of [
-    "gpt-6-sol",
-    "gpt-6-sol-3x",
-    "gpt-5.6-sol",
-    "gpt-5.6-sol-3x",
-  ]) {
+  for (const slug of ["gpt-6-sol", "gpt-5.6-sol"]) {
     const route = full.find((row) => row.slug === `codexgpt-bridge/${slug}`)!;
     assert.deepEqual(route.supportedEfforts, ["medium", "high", "xhigh"]);
     const budget = resolveBridgeRouteContextBudget(route, "pro");
-    assert.equal(budget.contextWindow, 240_000);
-    assert.equal(budget.hardInputTokenLimit, 240_000);
+    assert.equal(budget.contextWindow, 260_000);
+    assert.equal(budget.hardInputTokenLimit, 260_000);
     assert.equal(budget.autoCompactTokenLimit, 220_000);
     assert.equal(budget.browserMessageTokenLimit, 103_000);
     assert.equal(budget.browserComposerCharLimit, 500_000);
@@ -138,9 +133,9 @@ it("stages verified GPT-5.6 and GPT-6 Full reasoning context while retaining bou
   const model = catalog.models.find(
     (row) => row.slug === "codexgpt-bridge/gpt-6-sol",
   )!;
-  assert.equal(model.context_window, 240_000);
+  assert.equal(model.context_window, 260_000);
   assert.equal(model.auto_compact_token_limit, 220_000);
-  assert.equal(model.effective_context_window_percent, 92);
+  assert.equal(model.effective_context_window_percent, 85);
   const sol56 = catalog.models.find(
     (row) => row.slug === "codexgpt-bridge/gpt-5.6-sol",
   )!;
@@ -148,7 +143,7 @@ it("stages verified GPT-5.6 and GPT-6 Full reasoning context while retaining bou
     (row) => row.slug === "codexgpt-bridge/gpt-5.6-sol-instant",
   )!;
   assert.equal(sol56.visibility, "list");
-  assert.equal(sol56.context_window, 240_000);
+  assert.equal(sol56.context_window, 260_000);
   assert.equal(sol56.auto_compact_token_limit, 220_000);
   assert.equal(instant56.visibility, "list");
   assert.equal(instant56.context_window, 111_193);

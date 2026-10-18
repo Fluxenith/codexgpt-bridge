@@ -3,6 +3,7 @@ import { statSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import { isAbsolute, join } from "node:path";
+import { ensureTunnelClient } from "./tunnel-client-installer.js";
 
 export interface FullMcpTunnelSettings {
   readonly tunnelId: string;
@@ -101,12 +102,23 @@ export function parseTunnelStatusOutput(output: string): ParsedTunnelStatus {
 export class TunnelManager {
   readonly #profileDirectory: string;
   readonly #commandRunner: CommandRunner | undefined;
+  readonly #installClient: () => Promise<string>;
   #binary: string | undefined;
   #connected = false;
 
-  constructor(dataDirectory: string, commandRunner?: CommandRunner) {
+  constructor(
+    dataDirectory: string,
+    commandRunner?: CommandRunner,
+    installClient?: () => Promise<string>,
+  ) {
     this.#profileDirectory = join(dataDirectory, "tunnel", "profiles");
     this.#commandRunner = commandRunner;
+    this.#installClient =
+      installClient ??
+      (() =>
+        ensureTunnelClient(dataDirectory, (binary, args, timeout) =>
+          this.#run(binary, args, timeout),
+        ));
   }
 
   validate(settings: FullMcpTunnelSettings): void {
@@ -140,7 +152,7 @@ export class TunnelManager {
     if (!/^http:\/\/127\.0\.0\.1:\d{1,5}\/mcp$/u.test(mcpServerUrl)) {
       throw new Error("Full MCP server must be a loopback HTTP endpoint.");
     }
-    const binary = this.#resolveBinary(settings.tunnelClientPath);
+    const binary = await this.#resolveBinary(settings.tunnelClientPath);
     await mkdir(this.#profileDirectory, { recursive: true, mode: 0o700 });
 
     // `runtimes connect` updates the profile and runtime registry, but an
@@ -259,7 +271,16 @@ export class TunnelManager {
     }
   }
 
-  #resolveBinary(configured?: string): string {
+  async #resolveBinary(configured?: string): Promise<string> {
+    const override =
+      configured?.trim() || process.env.CODEXGPT_BRIDGE_TUNNEL_CLIENT?.trim();
+    if (override) {
+      if (!isAbsolute(override) || !isExistingFile(override))
+        throw new Error(
+          "Tunnel client override must be an existing absolute path. Clear it to use automatic setup.",
+        );
+      return override;
+    }
     const candidates = [
       configured,
       process.env.CODEXGPT_BRIDGE_TUNNEL_CLIENT?.trim(),
@@ -271,12 +292,7 @@ export class TunnelManager {
       ),
     ].filter((value): value is string => Boolean(value));
     const binary = candidates.find((candidate) => isExistingFile(candidate));
-    if (!binary) {
-      throw new Error(
-        "OpenAI tunnel-client was not found. Set its absolute path in Full MCP settings.",
-      );
-    }
-    return binary;
+    return binary ?? this.#installClient();
   }
 
   #run(

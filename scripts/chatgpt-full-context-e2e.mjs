@@ -119,39 +119,33 @@ try {
   });
   for (const {
     badAck,
-    stagedContext,
     temporaryChat = false,
     tamper = "",
     hiddenUser = false,
   } of [
-    { badAck: false, stagedContext: false },
-    { badAck: false, stagedContext: true },
-    { badAck: true, stagedContext: true },
-    { badAck: false, stagedContext: true, temporaryChat: true },
+    { badAck: false },
+    { badAck: true },
+    { badAck: false, temporaryChat: true },
     {
       badAck: false,
-      stagedContext: true,
       temporaryChat: true,
       hiddenUser: true,
     },
-    { badAck: true, stagedContext: true, temporaryChat: true },
+    { badAck: true, temporaryChat: true },
     {
       badAck: false,
-      stagedContext: true,
       temporaryChat: true,
       tamper: "inactive",
     },
     {
       badAck: false,
-      stagedContext: true,
       temporaryChat: true,
       tamper: "document",
     },
-    { badAck: false, stagedContext: true, temporaryChat: true, tamper: "body" },
-    { badAck: false, stagedContext: true, temporaryChat: true, tamper: "tool" },
+    { badAck: false, temporaryChat: true, tamper: "body" },
+    { badAck: false, temporaryChat: true, tamper: "tool" },
     {
       badAck: false,
-      stagedContext: true,
       temporaryChat: true,
       tamper: "media",
     },
@@ -159,10 +153,7 @@ try {
     if (process.argv.includes("--temporary-only") && !temporaryChat) continue;
     currentHtml = fixture(badAck, temporaryChat, tamper, hiddenUser);
     const result = await app.evaluate(
-      async (
-        { BrowserWindow },
-        { html, baseUrl, badAck, stagedContext, temporaryChat },
-      ) => {
+      async ({ BrowserWindow }, { html, baseUrl, badAck, temporaryChat }) => {
         const receipts = [];
         const controller = new globalThis.ChatGptBrowserController(
           temporaryChat
@@ -200,9 +191,7 @@ try {
           },
           execution: {
             version: 1,
-            route: stagedContext
-              ? "codexgpt-bridge/gpt-5.6-sol"
-              : "codexgpt-bridge/gpt-5.6-sol-3x",
+            route: "codexgpt-bridge/gpt-5.6-sol",
             mode: "high",
             operationToolTransport: "full",
             toolTransport: "full",
@@ -223,10 +212,8 @@ try {
             browserComposerCharLimit: 3_500,
             remainingInputTokens: 15_000,
             status: "within-limit",
-            budgetProfile: "owned-fixture-3x",
-            ...(stagedContext
-              ? { stagedContext: true }
-              : { contextMultiplier: 3 }),
+            budgetProfile: "owned-fixture-staged",
+            stagedContext: true,
           },
         };
         try {
@@ -260,7 +247,7 @@ try {
           await controller.close();
         }
       },
-      { html: currentHtml, baseUrl, badAck, stagedContext, temporaryChat },
+      { html: currentHtml, baseUrl, badAck, temporaryChat },
     );
     assert.equal(result.held, true, JSON.stringify(result));
     if (badAck || tamper) {
@@ -311,7 +298,7 @@ try {
       );
     }
     process.stdout.write(
-      `Full context Electron (${stagedContext ? "standard staged route" : "legacy 3x route"}${temporaryChat ? ", temporary" : ""}): ${badAck ? "bad ACK withheld commit after one stage" : tamper ? `changed ${tamper} withheld commit after one stage` : "ordered stages, final-only execution and duplicate observers passed"}\n`,
+      `Full context Electron (staged route${temporaryChat ? ", temporary" : ""}): ${badAck ? "bad ACK withheld commit after one stage" : tamper ? `changed ${tamper} withheld commit after one stage` : "ordered stages, final-only execution and duplicate observers passed"}\n`,
     );
   }
 } finally {

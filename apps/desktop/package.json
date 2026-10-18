@@ -2,6 +2,7 @@
   "name": "@codexgpt-bridge/desktop",
   "version": "0.0.1",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "main": "./dist/main/main.js",
   "scripts": {
@@ -10,6 +11,7 @@
   },
   "dependencies": {
     "@codexgpt-bridge/responses-gateway": "workspace:*",
+    "fflate": "0.8.3",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },

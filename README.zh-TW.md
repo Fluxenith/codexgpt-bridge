@@ -1,24 +1,60 @@
 # CodexGPT Bridge
 
-**把 ChatGPT 網頁模型接入 Codex。**
+**在 Codex 使用你 ChatGPT 帳號可用的網頁模型。**
 
 [English](README.md) · [繁體中文](README.zh-TW.md) · [简体中文](README.zh-CN.md) · [日本語](README.ja.md) · [한국어](README.ko.md)
 
-CodexGPT Bridge 連接 Codex 與你已登入的 ChatGPT 網頁，支援模型選擇、
-任務各自保留對話、圖片、進度顯示與取消。專案檔案、工具與核准由 Codex 管理。
+**[下載 Windows、macOS 或 Linux 安裝檔](https://github.com/Fluxenith/codexgpt-bridge/releases/latest)** ·
+**[快速開始](#開始使用)** ·
+**[回報試用結果](https://github.com/Fluxenith/codexgpt-bridge/issues/new?template=early_tester_feedback.md)**
+
+CodexGPT Bridge 連接 Codex 與你已登入的 ChatGPT 網頁。你可以在 Codex
+選擇帳號可用的網頁模型，並由 Codex 管理專案檔案、工具與核准。
+Bridge 支援每個任務獨立對話、圖片、進度顯示與取消。
 
 本專案為獨立第三方專案，與 OpenAI 沒有隸屬關係。
 
-要設定 GPT 外掛，請看下方的 **[ChatGPT 外掛設定](#chatgpt-外掛設定)**。
+**v0.1.103：** Full MCP 的官方 Tunnel 程式可自動下載並驗證，路徑留白即可。Tunnel ID、Runtime API key 與外掛權限仍需設定。
+
+## 觀看實際示範
+
+![CodexGPT Bridge：實際修正程式並通過測試](assets/launch/demo-preview-en.gif)
+
+展示紀錄與介面錄於 v0.1.102；下方自動安裝流程適用於 v0.1.103。
+
+46 秒英文示範 · [觀看完整畫質 MP4](assets/launch/demo-en.mp4)
+
+使用 Bridge 的 Medium 模型與 Full MCP，讓 Codex CLI 修正一個計算錯誤。
+相同測試由 **1 通過、2 失敗**變成 **3 通過、0 失敗**，測試斷言保持不變。
+影片為真實工具事件與輸出的剪輯重播，搭配實際英文 Bridge 介面截圖；
+本片未展示首次安裝流程。作者：[Fluxenith](https://github.com/Fluxenith)。
+
+## 選擇連線模式
+
+|          | Simple                  | Full MCP                                        |
+| -------- | ----------------------- | ----------------------------------------------- |
+| 適合     | 快速試用模型回覆        | 需要模型透過連接器呼叫 Codex 工具               |
+| 工具運作 | 以文字傳遞工具指令      | 使用 ChatGPT 自訂外掛與 Secure MCP Tunnel       |
+| 額外設定 | 不需要自訂外掛或 Tunnel | 需要外掛權限、Tunnel 權限與相容的 tunnel-client |
+
+建議初次先用 **Simple** 測試。如果帳號與工作區具備權限，
+且需要真正的工具呼叫，再設定 **Full MCP**。
+詳細步驟請看 **[ChatGPT 外掛設定](#chatgpt-外掛設定)**。
 
 ## 安裝
 
-從本倉庫的 **[Releases](https://github.com/chrisfluxx/codexgpt-bridge/releases/latest)** 頁面下載適合你作業系統的安裝檔。
+從本倉庫的 **[Releases](https://github.com/Fluxenith/codexgpt-bridge/releases/latest)** 頁面下載適合你作業系統的安裝檔。
 Windows 使用 `CodexGPT-Bridge-Setup-<版本>.exe`；macOS 使用 DMG；
 Linux 使用 AppImage 或 DEB。
 
+**macOS 測試版：** Intel 與 Apple Silicon 安裝檔尚未經 Apple 公證。首次嘗試
+開啟後，可能需要到「系統設定 → 隱私權與安全性 → 仍要打開」允許執行。
+請確認來源可信再允許，詳見 [Apple 官方說明](https://support.apple.com/zh-tw/102445)。
+
 你需要已安裝的 Codex，以及可使用所需模型的 ChatGPT 帳號。
 可用模型與使用額度依帳號而定。
+Bridge 依賴 ChatGPT 網頁介面，介面變動可能影響運作。使用前請確認
+相關服務條款與帳號條件；Bridge 不保證連線不中斷，也不會解除使用額度限制。
 
 ## 開始使用
 
@@ -34,11 +70,8 @@ Linux 使用 AppImage 或 DEB。
 
 介面支援英文、繁體中文、簡體中文、日文與韓文，可從「語言」選單切換。
 
-Full MCP 搭配 Pro 帳號時，GPT-5.6 Sol 與 GPT-6 Sol 的 Medium、High 與 Extra High 使用
-240,000 token 上下文，約在 220,000 token 壓縮。較大的初始內容會分段載入並逐段
-核對確認訊息，每則瀏覽器訊息仍遵守原本的上限。兩者的 Instant 都列為獨立選項，
-保留 111,193 token 上下文並在約 95,000 token 壓縮。長任務可顯示模型公開的中途進度；斷線續接時保留進度，且不重複
-已交付 Codex 的訊息。
+可用模型與實際上下文上限依 Bridge 版本及帳號而定。上方 Demo 驗證的是
+小型程式修改任務，並未測量最大上下文長度。
 
 ## ChatGPT 外掛設定
 
@@ -63,7 +96,6 @@ ChatGPT 工作區權限與 Platform 組織的 Tunnel 權限是分開管理的：
 
 若沒有權限，請由組織／工作區管理員開放；若目前無法使用，先選 **Simple**。
 僅有 ChatGPT Pro 訂閱不代表已取得 Tunnel 或工作區權限。
-v0.1.94 介面仍顯示較早的 Business／Enterprise／Edu 帳號需求提示；
 實際可用性及入口請以你的帳號和 [OpenAI 官方自訂 MCP 文件](https://developers.openai.com/api/docs/guides/custom-mcp-server) 為準。
 
 ### 2. 取得 Tunnel、Runtime API key 與官方 client
@@ -75,12 +107,12 @@ v0.1.94 介面仍顯示較早的 Business／Enterprise／Edu 帳號需求提示�
 3. 複製 Tunnel ID。格式為 `tunnel_` 加上 32 個小寫十六進位字元。
 4. 請 Platform 組織管理員提供供 `tunnel-client` 使用的 **Runtime API key**，
    確認對所選組織／Tunnel 有 **Read + Use** 權限。這個 key 稍後填入 Bridge，請勿放進 README、Issue 或截圖。
-5. 從 Tunnel 設定頁提供的官方下載入口，下載適合你作業系統與 CPU 架構的 `tunnel-client`，
-   解壓縮到固定位置。Windows 範例：`C:\Tools\tunnel-client.exe`；macOS／Linux 使用對應的可執行檔並授予執行權限。
+5. **tunnel-client 路徑留白即可。** 首次使用 Full MCP 時，Bridge 會依作業系統與 CPU 架構，
+   自動下載固定版本的官方程式、驗證 SHA-256 校驗碼，並安裝必要的伴隨檔案。
+   首次設定需要網路，之後會驗證並重用本機安裝；不必自行下載、解壓縮或指定路徑。
 
 Bridge 會管理 client 的啟動與本機 MCP 位址；依照這份教學設定時，不需要另外啟動一個指向相同 Tunnel 的 client。
-v0.1.94 使用 client 的 `runtimes connect` 功能；若遇到未知子命令，請更新官方 client，
-並以 `tunnel-client runtimes connect --help` 確認該功能可用。
+進階使用者仍可填入自行安裝的可執行檔絕對路徑；該版本需支援 `tunnel-client runtimes connect --help`。
 詳細權限、組織關聯與網路需求見 [官方 Secure MCP Tunnel 教學](https://developers.openai.com/api/docs/guides/secure-mcp-tunnels)。
 
 ### 3. 填入 Bridge，讓 Tunnel 就緒
@@ -90,18 +122,18 @@ v0.1.94 使用 client 的 `runtimes connect` 功能；若遇到未知子命令�
 2. 在「Codex 工具連線」選擇 **Full MCP — 連接器呼叫工具**，展開「進階 Tunnel 設定」。
 3. 填入以下欄位：
 
-   | Bridge 欄位            | 要填什麼                                                            |
-   | ---------------------- | ------------------------------------------------------------------- |
-   | ChatGPT connector 名稱 | 建議 `CodexGPT Bridge`；必須與稍後建立的外掛名稱完全一致，包括空格  |
-   | OpenAI Tunnel ID       | 第 2 步取得的完整 Tunnel ID                                         |
-   | OpenAI API key         | 供 tunnel-client 使用的 Runtime API key；已儲存時，不需每次重貼     |
-   | tunnel-client 路徑     | 解壓後可執行檔的絕對路徑；Windows 例如 `C:\Tools\tunnel-client.exe` |
+   | Bridge 欄位            | 要填什麼                                                           |
+   | ---------------------- | ------------------------------------------------------------------ |
+   | ChatGPT connector 名稱 | 建議 `CodexGPT Bridge`；必須與稍後建立的外掛名稱完全一致，包括空格 |
+   | OpenAI Tunnel ID       | 第 2 步取得的完整 Tunnel ID                                        |
+   | OpenAI API key         | 供 tunnel-client 使用的 Runtime API key；已儲存時，不需每次重貼    |
+   | tunnel-client 路徑     | 留白自動下載與驗證；只有覆寫為自行安裝版本時才填絕對路徑           |
 
 4. 按 **「套用」**，再按 **「安裝 Web 模型」** 啟動服務。已安裝模型且服務正在執行時，套用會重新啟動連線。
 5. 保持 Bridge 執行，確認出現 **「Tunnel：已就緒」**，再到 ChatGPT 建立外掛。
 
 **第一次只按「套用」，不會啟動尚未安裝的 Web 模型服務。**
-因此即使 ID、key 與 client 路徑都已填好，仍可能顯示「Tunnel：尚未就緒」。
+因此即使 ID 與 key 都已填好，仍可能顯示「Tunnel：尚未就緒」。
 先完成「安裝 Web 模型」；若安裝失敗，依畫面錯誤與下方排查表處理。
 
 ### 4. 在 ChatGPT 新增並安裝外掛
@@ -140,7 +172,8 @@ v0.1.94 使用 client 的 `runtimes connect` 功能；若遇到未知子命令�
 | 現象                                   | 檢查與處理                                                                                                   |
 | -------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | Tunnel 尚未就緒，只有按過「套用」      | 按「安裝 Web 模型」啟動服務；保持 Bridge 執行                                                                |
-| 安裝模型時回報 client 路徑或子命令錯誤 | 指向實際的 client 可執行檔，使用絕對路徑，確認系統／架構與 `runtimes connect` 功能相容                       |
+| 安裝模型時回報 client 路徑或子命令錯誤 | 清空 client 路徑以使用自動安裝；若自行指定，確認絕對路徑、系統／架構與 `runtimes connect` 功能相容           |
+| 自動下載失敗或校驗碼不符               | 確認可連線至 GitHub 官方下載後重試；驗證失敗不會執行下載內容，也可在進階設定指定自行安裝的官方程式           |
 | key 或 Tunnel 驗證失敗                 | 確認 key 未失效、ID 完整、所屬組織正確，並具 Tunnels Read + Use；填入新 key 後重新套用                       |
 | Platform 顯示 Tunnels access required  | 請 Platform 組織管理員授予組織層級的 Tunnel 權限；新角色可能需要最多 30 分鐘生效                             |
 | ChatGPT 找不到 Tunnel                  | 確認 Tunnel 關聯到目前 ChatGPT 工作區，且建立外掛的使用者有 Read + Use                                       |
@@ -154,13 +187,20 @@ v0.1.94 使用 client 的 `runtimes connect` 功能；若遇到未知子命令�
 GitHub 發布流程會將此倉庫的更新網址內建至安裝包，使用者不需手動設定。
 Bridge 會在啟動與背景執行期間
 檢查新版；線上更新需要可存取的更新清單與安裝檔。更新來源尚未可用時，
-請從 **[Releases](https://github.com/chrisfluxx/codexgpt-bridge/releases/latest)** 下載新版。
+請從 **[Releases](https://github.com/Fluxenith/codexgpt-bridge/releases/latest)** 下載新版。
 
 連線失敗時，先確認 ChatGPT 登入狀態，再執行 Bridge 的「Doctor」。
 回報問題時請附上程式版本、作業系統與重現步驟，並移除帳號資料、
 私人路徑、對話內容與憑證。
 
 登入資料與設定儲存在應用程式的本機使用者設定檔。
+
+## 協助測試 Bridge
+
+Bridge 還在早期階段。如果你願意試用，歡迎
+**[提供測試回饋](https://github.com/Fluxenith/codexgpt-bridge/issues/new?template=early_tester_feedback.md)**：
+請註明作業系統、連線模式、能否完成設定，以及是否成功在 Codex
+執行一個小任務。請勿附上憑證、Cookie、私人程式碼、個人對話及帳號識別資訊。
 
 ## 從原始碼啟動
 
@@ -174,4 +214,4 @@ pnpm desktop
 ## 第三方授權
 
 依賴套件的授權保留在 [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt)
-及 `LICENSES/`。本專案尚未選定授權條款。
+及 `LICENSES/`。本專案採用 [MIT 授權條款](LICENSE)。

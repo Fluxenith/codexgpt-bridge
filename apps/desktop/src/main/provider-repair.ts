@@ -1,5 +1,29 @@
+import {
+  isCodexInterruptHookFullyAbsent,
+  type InstalledCodexInterruptHook,
+} from "./codex-interrupt-hook.js";
+
 const START = "# >>> CodexGPT Bridge managed Web provider";
 const END = "# <<< CodexGPT Bridge managed Web provider";
+
+/** A stale journal can be replaced only after all of its config references are gone. */
+export function isCodexProviderFullyDetached(
+  text: string,
+  journal: {
+    readonly baseUrl: string;
+    readonly catalogPath: string;
+    readonly interruptHook: InstalledCodexInterruptHook;
+  },
+): boolean {
+  return (
+    !text.includes(START) &&
+    !text.includes(END) &&
+    !text.includes(journal.baseUrl.replace(/\/+$/u, "")) &&
+    !text.includes(journal.catalogPath) &&
+    !text.includes(JSON.stringify(journal.catalogPath).slice(1, -1)) &&
+    isCodexInterruptHookFullyAbsent(text, journal.interruptHook)
+  );
+}
 
 export interface ProviderRepairPlan {
   readonly previousRoute: string;

@@ -163,6 +163,9 @@ const WEB_NATIVE_TOOL_TIMEOUT_MS = 10_000;
 const RATE_LIMIT_RESPONSE_GRACE_MS = 5_000;
 const CLOUDFLARE_CHALLENGE_TIMEOUT_MS = 10 * 60_000;
 const POST_COMPLETION_RATE_LIMIT_WATCH_MS = 5_000;
+// Full context stages can take several minutes to produce an exact ACK on
+// higher-effort models. Keep the final commit withheld until it is observed.
+const CONTEXT_STAGE_ACK_TIMEOUT_MS = 6 * 60_000;
 const CHATGPT_MAX_INPUT_IMAGES = 10;
 const CHATGPT_MAX_IMAGE_BYTES = 20_000_000;
 const CHATGPT_MAX_IMAGE_BYTES_PER_TURN = 50_000_000;
@@ -1783,12 +1786,7 @@ class ChatGptBrowserSession {
     input.onProgress?.("preparing");
     if (
       input.prompt.length >
-      (input.execution?.stagedContext ||
-      input.execution?.contextMultiplier === 3
-        ? 24
-        : 4) *
-        1024 *
-        1024
+      (input.execution?.stagedContext ? 24 : 4) * 1024 * 1024
     ) {
       throw new Error(
         "ChatGPT Web prompt exceeds the 4 MiB browser-provider limit.",
@@ -1992,7 +1990,7 @@ class ChatGptBrowserSession {
       recoverableToolFailure = undefined;
     }
     await this.#timed("composer-ready", () =>
-      this.#ensureReady(window, input.signal),
+      this.#ensureReady(window, input.signal, freshConversation),
     );
     await this.#ensureTemporaryChat(window, input);
     if (savedUrl && window.webContents.getURL().split("?", 1)[0] !== savedUrl) {
@@ -2103,15 +2101,7 @@ class ChatGptBrowserSession {
           "\n" +
           input.prompt;
     let prompt = buildPrompt();
-    if (
-      prompt.length >
-      (input.execution?.stagedContext ||
-      input.execution?.contextMultiplier === 3
-        ? 24
-        : 4) *
-        1024 *
-        1024
-    )
+    if (prompt.length > (input.execution?.stagedContext ? 24 : 4) * 1024 * 1024)
       throw new Error(
         "Synchronized Codex context exceeds the 4 MiB browser limit; compact the task first.",
       );
@@ -2131,7 +2121,7 @@ class ChatGptBrowserSession {
       let problem = bridgeExecutionLimitProblem(execution);
       if (
         problem &&
-        (execution.stagedContext || execution.contextMultiplier === 3) &&
+        execution.stagedContext &&
         execution.toolTransport === "full" &&
         !input.requireRetainedConversation
       ) {
@@ -2910,7 +2900,8 @@ class ChatGptBrowserSession {
           projectUrl,
         );
       const completion = new ChatGptCompletionTracker();
-      const deadline = Date.now() + 180_000;
+      const deadline = Date.now() + CONTEXT_STAGE_ACK_TIMEOUT_MS;
+      let lastCompletionReason = "";
       while (Date.now() < deadline) {
         input.signal.throwIfAborted();
         const limited = this.#rateLimitObservation();
@@ -2942,6 +2933,14 @@ class ChatGptBrowserSession {
           webNativeToolPresent: observation.webNativeToolPresent,
           completionActionVisible: observation.completionActionVisible,
         });
+        if (completion.reason !== lastCompletionReason) {
+          trace.event(`context-stage-${index}-${completion.reason}`);
+          lastCompletionReason = completion.reason;
+        }
+        if (hasNewAssistant && observation.text)
+          trace.mark(`context-stage-${index}-first-content`);
+        if (hasNewAssistant && observation.terminalConfirmed)
+          trace.mark(`context-stage-${index}-terminal-confirmed`);
         if (completed !== undefined) {
           if (
             typeof completed !== "string" ||
@@ -2981,8 +2980,9 @@ class ChatGptBrowserSession {
         await delay(250, input.signal);
         observation = await this.#observe(window);
       }
+      trace.event("context-stage-ack-timeout");
       throw new FullContextTransferError(
-        `Context part ${index} exceeded its three-minute acknowledgement deadline. The final commit was withheld.`,
+        `Context part ${index} exceeded its six-minute acknowledgement deadline. The final commit was withheld.`,
       );
     } catch (error) {
       await this.#stopGenerating(window);
@@ -3292,15 +3292,42 @@ class ChatGptBrowserSession {
   async #ensureReady(
     window: ChatGptWindow,
     signal: AbortSignal,
+    recoverFreshPage = false,
   ): Promise<void> {
     // The document may already expose a usable composer while subresources are loading.
     // Waiting for a did-finish-load event here races with loadURL and can waste 20 seconds.
     const deadline = Date.now() + 20_000;
+    const recoveryAt = Date.now() + 3_000;
     while (Date.now() < deadline) {
+      signal.throwIfAborted();
       const observation = await this.#observe(window);
       if (observation.composer) {
         await this.#assertServerSession(window, signal);
         return;
+      }
+      // A fresh Temporary Chat can render the logged-out mobile shell even
+      // while its cookie session is valid. Reload that empty document once,
+      // only after verifying the server session. Never refresh retained turns,
+      // drafts or a submitted response as part of this recovery.
+      if (
+        recoverFreshPage &&
+        Date.now() >= recoveryAt &&
+        observation.userCount === 0 &&
+        observation.assistantCount === 0 &&
+        !observation.responseBusy &&
+        !hasComposerText(observation.composerText) &&
+        (await this.#execute<boolean>(
+          window,
+          "observe-stale-login-shell",
+          `Boolean(document.querySelector('#web-mobile-root a[href*="noauth_recent_chat_failed"]'))`,
+        ))
+      ) {
+        await this.#assertServerSession(window, signal);
+        signal.throwIfAborted();
+        await this.#timed("stale-login-shell-reload", () =>
+          window.loadURL(window.webContents.getURL()),
+        );
+        return this.#ensureReady(window, signal);
       }
       await delay(250, signal);
     }

@@ -101,7 +101,6 @@ export interface BridgeWebModelRoute {
   readonly contextWindow: number;
   readonly supportedEfforts?: readonly BridgeNativeEffort[];
   readonly nativeFamily?: BridgeNativeModelFamily;
-  readonly contextMultiplier?: 3;
   readonly stagedContext?: true;
 }
 
@@ -197,7 +196,6 @@ export interface BridgeExecutionPreflight {
   readonly status:
     "within-limit" | "compaction-recommended" | "compaction-bypass";
   readonly budgetProfile: string;
-  readonly contextMultiplier?: 3;
   readonly stagedContext?: true;
   readonly multipart?: {
     readonly transactionId: string;
@@ -1153,9 +1151,6 @@ function bridgeExecutionPreflight(
         ? "compaction-recommended"
         : "within-limit",
     budgetProfile: budget.profile ?? BRIDGE_CONTEXT_BUDGET_PROFILE,
-    ...(route.contextMultiplier
-      ? { contextMultiplier: route.contextMultiplier }
-      : {}),
     ...(budget.stagedContext ? { stagedContext: true } : {}),
   };
 }
@@ -2129,7 +2124,7 @@ function bridgeModel(
     supported_reasoning_levels: (route.supportedEfforts ?? [route.effort]).map(
       (effort) => ({ effort, description: `${route.displayName} · ${effort}` }),
     ),
-    visibility: route.contextMultiplier ? "hide" : "list",
+    visibility: "list",
     supported_in_api: true,
     // gpt-5.6 templates currently opt into Responses Lite, which moves every
     // client tool schema into an input.additional_tools item and leaves the
@@ -2269,13 +2264,14 @@ export function mergeModelsPayload(
     families,
     nativeRoutesEnabled,
   );
-  const hasNamedRoutes = nativeRoutes.some((route) => !route.contextMultiplier);
+  const hasNamedRoutes = nativeRoutes.length > 0;
   models.push(
-    ...availableBridgeRoutes(availableModes).map((route, index) => ({
-      ...bridgeModel(template, route, 50 + index, accountProfile),
-      // Retain legacy IDs for existing chats while named routes own the picker.
-      visibility: hasNamedRoutes ? "hide" : "list",
-    })),
+    // Keep generic fallback IDs only when family-specific routes cannot be
+    // verified. The gateway still accepts saved generic IDs in older tasks.
+    ...(hasNamedRoutes ? [] : availableBridgeRoutes(availableModes)).map(
+      (route, index) =>
+        bridgeModel(template, route, 50 + index, accountProfile),
+    ),
     ...nativeRoutes.map((route, index) =>
       bridgeModel(template, route, 30 + index, accountProfile),
     ),
@@ -2345,7 +2341,14 @@ export function buildWebOnlyModelsPayload(
   if (!catalog || !Array.isArray(catalog.models)) {
     throw new Error("Web-only model catalog is unavailable.");
   }
-  const legacyRoutes = availableBridgeRoutes(availableModes);
+  const namedRoutes = availableNativeModelRoutes(
+    availableModes,
+    accountProfile,
+    families,
+    nativeRoutesEnabled,
+  );
+  const legacyRoutes =
+    namedRoutes.length === 0 ? availableBridgeRoutes(availableModes) : [];
   const rows = [...catalog.models];
   const pro = legacyRoutes.find((route) => route.mode === "pro");
   if (pro && !rows.some((row) => modelSlug(row) === pro.slug)) {
@@ -2370,12 +2373,7 @@ export function buildWebOnlyModelsPayload(
         return (
           route !== undefined &&
           (route.supportedEfforts
-            ? availableNativeModelRoutes(
-                availableModes,
-                accountProfile,
-                families,
-                nativeRoutesEnabled,
-              ).some((candidate) => candidate.slug === route.slug)
+            ? namedRoutes.some((candidate) => candidate.slug === route.slug)
             : legacyRoutes.some((candidate) => candidate.slug === route.slug))
         );
       })
@@ -3196,6 +3194,16 @@ export class ResponsesGateway {
         record?.model,
         record?.reasoning,
       );
+      if (isBridgeWebModel(record?.model) && !knownBridgeRoute) {
+        json(response, 400, {
+          error: {
+            type: "invalid_request_error",
+            code: "unsupported_bridge_web_model",
+            message: `Unknown CodexGPT Bridge Web model: ${String(record?.model)}`,
+          },
+        });
+        return;
+      }
       if (knownBridgeRoute && !availableBridgeRoute) {
         json(response, 400, {
           error: {

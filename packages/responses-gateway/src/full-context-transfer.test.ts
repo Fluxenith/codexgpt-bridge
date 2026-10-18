@@ -5,6 +5,8 @@ import { planFullContextTransfer } from "./full-context-transfer.js";
 import { estimateBridgeTextTokens } from "./input-tokens.js";
 import { FullTurnBroker } from "./full-turn-broker.js";
 import { buildStartupModelsPayload } from "./responses-server.js";
+import { availableNativeModelRoutes } from "./native-model-routes.js";
+import { resolveBridgeRouteContextBudget } from "./context-budgets.js";
 import { prepareBridgeWebTurn } from "./tool-protocol.js";
 import { compileResponsesPrompt } from "./prompt.js";
 
@@ -178,7 +180,7 @@ it("withholds the actual broker tool surface through staging and opens it only f
   broker.revoke(token);
 });
 
-it("advertises a real threefold transaction while leaving per-message boundaries unchanged", () => {
+it("retains staged context budgets without advertising retired routes", () => {
   const result = buildStartupModelsPayload(
     { models: [{ slug: "native", base_instructions: "native instructions" }] },
     ["medium", "high", "extra-high", "pro"],
@@ -186,15 +188,24 @@ it("advertises a real threefold transaction while leaving per-message boundaries
     ["5.6", "6"],
   ) as { models: Array<Record<string, unknown>> };
   const base = result.models.find(
-    (row) => row.slug === "codexgpt-bridge/gpt-6-pro",
+    (row) => row.slug === "codexgpt-bridge/gpt-6-sol",
   )!;
-  const bigger = result.models.find(
-    (row) => row.slug === "codexgpt-bridge/gpt-6-pro-3x",
-  )!;
-  assert.equal(bigger.context_window, (base.context_window as number) * 3);
-  assert.equal(
-    bigger.auto_compact_token_limit,
-    (base.auto_compact_token_limit as number) * 3,
+  const native = availableNativeModelRoutes(
+    ["medium", "high", "extra-high", "pro"],
+    "pro",
+    ["5.6", "6"],
   );
-  assert.equal(bigger.default_reasoning_level, "max");
+  assert.equal(
+    result.models.some((row) => String(row.slug).endsWith("-3x")),
+    false,
+  );
+  assert.equal(
+    native.some((row) => row.slug.endsWith("-3x")),
+    false,
+  );
+  const staged = native.find((row) => row.slug === base.slug)!;
+  const budget = resolveBridgeRouteContextBudget(staged, "pro");
+  assert.equal(budget.contextWindow, 260_000);
+  assert.equal(budget.autoCompactTokenLimit, 220_000);
+  assert.equal(budget.contextWindow, base.context_window);
 });

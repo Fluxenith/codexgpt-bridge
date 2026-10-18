@@ -11,11 +11,17 @@ CodexGPT Bridge 将 Codex 连接到已登录的 ChatGPT 网页会话，支持模
 
 GPT 插件与 Full MCP 设置教程：[繁體中文](README.zh-TW.md#chatgpt-外掛設定) · [English](README.md#chatgpt-plugin-setup)。
 
+**v0.1.103：** Full MCP 可自动下载并验证官方 Tunnel 程序，路径留空即可；Tunnel 凭据和插件权限仍需设置。
+
 ## 安装
 
-从本仓库的 **[Releases](https://github.com/chrisfluxx/codexgpt-bridge/releases/latest)** 页面下载适合你的操作系统的安装包。
+从本仓库的 **[Releases](https://github.com/Fluxenith/codexgpt-bridge/releases/latest)** 页面下载适合你的操作系统的安装包。
 Windows 使用 `CodexGPT-Bridge-Setup-<版本>.exe`；macOS 使用 DMG；
 Linux 使用 AppImage 或 DEB。
+
+**macOS 测试版：** Intel 和 Apple Silicon 安装包尚未经 Apple 公证。首次尝试
+打开后，可能需要在“系统设置 → 隐私与安全性 → 仍要打开”中允许运行。
+请确认来源可信后再允许，参见 [Apple 官方说明](https://support.apple.com/zh-cn/102445)。
 
 你需要已安装的 Codex，以及可以使用所需模型的 ChatGPT 账号。
 可用模型与使用额度取决于账号。
@@ -38,7 +44,7 @@ Linux 使用 AppImage 或 DEB。
 
 GitHub 发布流程会将本仓库的更新网址内置到安装包，用户不需要手动设置。
 Bridge 会在启动和后台运行时检查新版本。在线更新需要可访问的更新清单与安装包；
-更新源尚不可用时，请从 **[Releases](https://github.com/chrisfluxx/codexgpt-bridge/releases/latest)** 下载新版本。
+更新源尚不可用时，请从 **[Releases](https://github.com/Fluxenith/codexgpt-bridge/releases/latest)** 下载新版本。
 
 连接失败时，请先确认 ChatGPT 登录状态，再运行 Bridge 的 **Doctor** 诊断。
 报告问题时，请附上程序版本、操作系统和复现步骤，并移除账号信息、
@@ -58,4 +64,4 @@ pnpm desktop
 ## 第三方许可
 
 依赖包的许可证保存在 [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt)
-和 `LICENSES/` 中。本项目尚未选定许可证。
+和 `LICENSES/` 中。本项目采用 [MIT 许可证](LICENSE)。

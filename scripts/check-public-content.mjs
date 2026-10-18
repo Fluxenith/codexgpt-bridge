@@ -11,6 +11,7 @@ const publicDocuments = new Set([
   "README.ja.md",
   "README.ko.md",
   ".github/ISSUE_TEMPLATE/bug_report.md",
+  ".github/ISSUE_TEMPLATE/early_tester_feedback.md",
   ".github/PULL_REQUEST_TEMPLATE.md",
 ]);
 const rootFiles = new Set([
@@ -24,6 +25,7 @@ const rootFiles = new Set([
   "tsconfig.base.json",
   "tsconfig.json",
   "THIRD_PARTY_NOTICES.txt",
+  "LICENSE",
   ...publicDocuments,
 ]);
 const publicDirectories = new Set([
@@ -46,6 +48,10 @@ const publicImages = new Set([
   "assets/bridge-icon.ico",
   "assets/bridge-icon.icns",
   "assets/bridge-icon.png",
+  "assets/launch/bridge-connected-en.png",
+  "assets/launch/demo-poster-en.png",
+  "assets/launch/demo-preview-en.gif",
+  "assets/launch/demo-en.mp4",
   "apps/desktop/src/renderer/public/bridge-icon.png",
 ]);
 const removedProjectIdentifier = /\b(?:codex|code)[-_ ]*chatgpt[-_ ]*web/iu;

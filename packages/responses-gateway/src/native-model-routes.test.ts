@@ -32,7 +32,7 @@ const native = {
 };
 const catalog = { models: [native] };
 
-it("lists six proven models while retaining hidden legacy and experimental IDs across refresh", () => {
+it("lists only six verified routes and prunes obsolete saved IDs across refresh", () => {
   const modes: BridgeWebMode[] = [
     "instant",
     "medium",
@@ -44,15 +44,23 @@ it("lists six proven models while retaining hidden legacy and experimental IDs a
     "5.6",
     "6",
   ]) as { models: Array<Record<string, unknown>> };
+  const previousCatalog = {
+    ...first,
+    models: [
+      ...first.models,
+      { slug: "codexgpt-bridge/high", visibility: "hide" },
+      { slug: "codexgpt-bridge/gpt-6-sol-3x", visibility: "hide" },
+    ],
+  };
   for (const payload of [
     first,
-    buildStartupModelsPayload(first, modes, "pro"),
-    buildWebOnlyModelsPayload(first, modes, "pro"),
+    buildStartupModelsPayload(previousCatalog, modes, "pro"),
+    buildWebOnlyModelsPayload(previousCatalog, modes, "pro"),
   ]) {
     const rows = (payload as typeof first).models.filter((row) =>
       String(row.slug).startsWith("codexgpt-bridge/"),
     );
-    assert.equal(rows.length, 15);
+    assert.equal(rows.length, 6);
     assert.deepEqual(
       rows
         .filter((row) => row.visibility === "list")
@@ -68,13 +76,12 @@ it("lists six proven models while retaining hidden legacy and experimental IDs a
       ],
     );
     assert.equal(
-      rows.find((row) => row.slug === "codexgpt-bridge/high")?.visibility,
-      "hide",
+      rows.some((row) => row.slug === "codexgpt-bridge/high"),
+      false,
     );
     assert.equal(
-      rows.find((row) => row.slug === "codexgpt-bridge/gpt-6-sol-3x")
-        ?.visibility,
-      "hide",
+      rows.some((row) => String(row.slug).endsWith("-3x")),
+      false,
     );
   }
   assert.deepEqual(first.models[0], native);
@@ -174,11 +181,11 @@ it("exposes separately verified GPT-5.6 and GPT-6 Sol routes with equal-budget e
       "codexgpt-bridge/gpt-5.6-sol-instant",
     ],
   );
+  assert.equal(pro.filter((row) => row.mode === "pro").length, 2);
   assert.equal(
-    pro.filter((row) => row.mode === "pro" && !row.contextMultiplier).length,
-    2,
+    pro.some((row) => row.slug.endsWith("-3x")),
+    false,
   );
-  assert.ok(pro.some((row) => row.slug === "codexgpt-bridge/gpt-6-sol-3x"));
   const simple = availableNativeModelRoutes(
     allModes,
     "pro",
@@ -189,10 +196,7 @@ it("exposes separately verified GPT-5.6 and GPT-6 Sol routes with equal-budget e
   assert.ok(simple.some((row) => row.slug === "codexgpt-bridge/gpt-5.6-sol"));
   assert.ok(simple.some((row) => row.slug === "codexgpt-bridge/gpt-6-pro"));
   assert.equal(
-    simple.some(
-      (row) =>
-        row.contextMultiplier || row.slug === "codexgpt-bridge/luna-native",
-    ),
+    simple.some((row) => row.slug === "codexgpt-bridge/luna-native"),
     false,
   );
   assert.deepEqual(availableNativeModelRoutes(["high"], "pro", []), []);
@@ -291,7 +295,7 @@ it("routes native Responses effort to the Full browser and rejects unavailable m
         const instant = input.mode === "instant";
         assert.equal(
           input.execution.contextWindow,
-          instant ? 111_193 : 240_000,
+          instant ? 111_193 : 260_000,
         );
         assert.equal(
           input.execution.autoCompactTokenLimit,
@@ -466,7 +470,11 @@ it("runs explicit GPT-5.6 and GPT-6 Web routes in Simple without Full MCP", asyn
         input: "test",
       }),
     });
-    assert.notEqual(staged.status, 200);
+    assert.equal(staged.status, 400);
+    assert.equal(
+      ((await staged.json()) as { error: { code: string } }).error.code,
+      "unsupported_bridge_web_model",
+    );
   } finally {
     await gateway.close();
   }

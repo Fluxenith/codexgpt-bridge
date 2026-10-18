@@ -104,7 +104,7 @@ export class ManualTurns {
           const problem = bridgeExecutionLimitProblem(execution);
           if (problem) {
             if (
-              (!execution.stagedContext && execution.contextMultiplier !== 3) ||
+              !execution.stagedContext ||
               input.requireRetainedConversation ||
               !input.onContextStaging ||
               !input.onContextCommit ||

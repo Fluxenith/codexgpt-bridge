@@ -408,17 +408,17 @@ it("manual cancellation and missing Sent timeouts release their queue slots", as
   broker.close();
 });
 
-it("manual 3x context requires exact staged acknowledgements and commits tools only after the final send", async () => {
+it("manual staged context requires exact acknowledgements and commits tools only after final send", async () => {
   const broker = new FullTurnBroker();
   const host = new ManualTurns(broker);
-  const token = broker.register("manual-3x", [], true);
+  const token = broker.register("manual-staged", [], true);
   const abort = new AbortController();
   const compiled = compileResponsesPrompt({
     input: "alpha beta gamma ".repeat(1600),
   });
   const execution: BridgeExecutionPreflight = {
     version: 1,
-    route: "codexgpt-bridge/gpt-6.1-sol-3x",
+    route: "codexgpt-bridge/gpt-6-sol",
     mode: "high",
     operationToolTransport: "full",
     toolTransport: "full",
@@ -439,12 +439,12 @@ it("manual 3x context requires exact staged acknowledgements and commits tools o
     remainingInputTokens: 30000,
     status: "within-limit",
     budgetProfile: "test",
-    contextMultiplier: 3,
+    stagedContext: true,
   };
   let committed = false;
   const work = host.runTurn({
     turnToken: token,
-    threadId: "thread-3x",
+    threadId: "thread-staged",
     mode: "high",
     prompt: compiled.prompt,
     context: compiled.context,

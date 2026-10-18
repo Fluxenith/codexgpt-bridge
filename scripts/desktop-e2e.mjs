@@ -722,6 +722,20 @@ try {
   let page = await currentApp.firstWindow();
   attachRendererDiagnostics(page);
   await page.getByRole("button", { name: "Install Web models" }).waitFor();
+  const tunnelSettings = page.getByText("Advanced Tunnel settings", {
+    exact: true,
+  });
+  await tunnelSettings.click();
+  assert.equal(await page.locator("#full-mcp-client").inputValue(), "");
+  assert.equal(
+    await page.locator("#full-mcp-client").getAttribute("placeholder"),
+    "Automatic — leave blank",
+  );
+  assert.match(
+    await page.locator("#full-mcp-client-help").innerText(),
+    /download and verify/u,
+  );
+  await tunnelSettings.click();
   const language = page.locator(".languagePicker select");
   await language.waitFor();
   await language.selectOption("zh-TW");

@@ -9,7 +9,7 @@ export type BridgeAccountContextProfile = "compatibility" | "standard" | "pro";
 
 // Use the locally verified GPT-5.6 and GPT-6 Sol Pro-account retention budget.
 // The browser message envelope stays smaller; larger payloads must be staged.
-export const BRIDGE_SOL_FULL_CONTEXT_WINDOW = 240_000;
+export const BRIDGE_SOL_FULL_CONTEXT_WINDOW = 260_000;
 export const BRIDGE_SOL_FULL_AUTO_COMPACT_LIMIT = 220_000;
 // Preserve the names exported before GPT-5.6 gained the same Full profile.
 export const BRIDGE_GPT6_FULL_CONTEXT_WINDOW = BRIDGE_SOL_FULL_CONTEXT_WINDOW;
@@ -51,22 +51,7 @@ export function resolveBridgeRouteContextBudget(
       autoCompactTokenLimit: 1_050_000,
       profile: `${budget.profile}-luna-rolling`,
     };
-  if (!route.contextMultiplier) return budget;
-  if (
-    profile === "compatibility" ||
-    route.mode === "luna" ||
-    route.mode === "think"
-  )
-    throw new Error(
-      "This model does not support the Full multipart context profile.",
-    );
-  return {
-    ...budget,
-    contextWindow: budget.contextWindow * 3,
-    hardInputTokenLimit: budget.hardInputTokenLimit * 3,
-    autoCompactTokenLimit: budget.autoCompactTokenLimit * 3,
-    profile: `${budget.profile}-3x`,
-  };
+  return budget;
 }
 
 /** Reference transport boundaries; these are not new measurements of this account. */

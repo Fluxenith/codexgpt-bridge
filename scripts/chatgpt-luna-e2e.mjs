@@ -112,6 +112,7 @@ try {
           ...input,
           signal: undefined,
           onProgress: undefined,
+          onCommentary: undefined,
           onStreamSnapshot: undefined,
           onContextCommit: undefined,
           onContextStaging: undefined,

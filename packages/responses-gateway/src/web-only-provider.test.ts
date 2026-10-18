@@ -176,13 +176,13 @@ it("blocks native and legacy models, wrong credentials and credential leakage to
     "Content-Type": "application/json",
   };
   try {
-    for (const model of [
-      "gpt-reserve",
-      "gpt-5.6-luna",
-      "gpt-native",
-      "chatgpt-web/high",
-      "codexgpt-bridge/unknown",
-    ]) {
+    for (const [model, expectedCode] of [
+      ["gpt-reserve", "web_only_model_required"],
+      ["gpt-5.6-luna", "web_only_model_required"],
+      ["gpt-native", "web_only_model_required"],
+      ["chatgpt-web/high", "web_only_model_required"],
+      ["codexgpt-bridge/unknown", "unsupported_bridge_web_model"],
+    ] as const) {
       const response = await fetch(url + "/responses", {
         method: "POST",
         headers,
@@ -191,7 +191,7 @@ it("blocks native and legacy models, wrong credentials and credential leakage to
       assert.equal(response.status, 400);
       assert.equal(
         ((await response.json()) as { error: { code: string } }).error.code,
-        "web_only_model_required",
+        expectedCode,
       );
     }
     for (const path of ["/usage", "/images/generations", "/responses/other"]) {

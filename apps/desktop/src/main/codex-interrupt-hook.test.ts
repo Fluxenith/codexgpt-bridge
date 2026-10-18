@@ -9,8 +9,40 @@ import {
   restoreCodexInterruptHook,
   verifyCodexInterruptHook,
 } from "./codex-interrupt-hook.js";
+import { isCodexProviderFullyDetached } from "./provider-repair.js";
 
 describe("Codex Interrupt hook integration", () => {
+  it("recognizes a fully removed provider but rejects leftover owned references", () => {
+    const config = 'openai_base_url = "http://127.0.0.1:17841/v1"\n';
+    const hook = installCodexInterruptHook(
+      config,
+      "/tmp/config.toml",
+      "bridge hook",
+    );
+    const journal = {
+      baseUrl: "http://127.0.0.1:7767/v1",
+      catalogPath: "C:\\Users\\test\\.codex\\bridge-models.json",
+      interruptHook: hook.installed,
+    };
+    assert.equal(isCodexProviderFullyDetached(config, journal), true);
+    for (const leftover of [
+      "# >>> CodexGPT Bridge managed Web provider",
+      "# <<< CodexGPT Bridge managed Web provider",
+      `openai_base_url = "${journal.baseUrl}/"`,
+      `model_catalog_json = ${JSON.stringify(journal.catalogPath)}`,
+      `model_catalog_json = '${journal.catalogPath}'`,
+      hook.installed.fragment,
+      hook.installed.command,
+      hook.installed.stateKey,
+      hook.installed.trustedHash,
+    ]) {
+      assert.equal(
+        isCodexProviderFullyDetached(config + leftover, journal),
+        false,
+      );
+    }
+  });
+
   it("adds a trusted synchronous hook after existing user hooks", () => {
     const original = [
       'model = "native"',
