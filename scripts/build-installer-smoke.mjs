@@ -1,4 +1,4 @@
-import { readFile, writeFile } from "node:fs/promises";
+import { access, copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath, URL } from "node:url";
 import { join } from "node:path";
 import process from "node:process";
@@ -14,8 +14,18 @@ const metadata = JSON.parse(
 const productName = "CodexGPT Bridge Installer Smoke";
 const appId = "io.codexgpt.bridge.installer-smoke";
 const output = join(projectDir, "release", "installer-smoke");
+const installerName = `CodexGPT-Bridge-Setup-${metadata.version}.exe`;
+const prepackaged = join(projectDir, "release", "win-unpacked");
+await access(join(prepackaged, "CodexGPT Bridge.exe")).catch(() => {
+  throw new Error(
+    "Installer smoke requires release/win-unpacked; run pnpm package:win:dir first.",
+  );
+});
 const buildOptions = {
   projectDir,
+  // Reuse the app already built by CI. Packaging again can hit Windows file
+  // scanner locks while copying Electron's LICENSES.chromium.html.
+  prepackaged,
   targets: Platform.WINDOWS.createTarget(["nsis"], Arch.x64),
   publish: "never",
   config: {
@@ -35,7 +45,24 @@ const buildOptions = {
 };
 for (let attempt = 1; ; attempt += 1) {
   try {
-    await build(buildOptions);
+    // A failed Windows build may leave the destination locked by a scanner.
+    // Use a fresh directory on each attempt instead of overwriting that file.
+    const attemptOutput = join(output, `attempt-${attempt}`);
+    await build({
+      ...buildOptions,
+      config: {
+        ...buildOptions.config,
+        directories: {
+          ...buildOptions.config.directories,
+          output: attemptOutput,
+        },
+      },
+    });
+    await mkdir(output, { recursive: true });
+    await copyFile(
+      join(attemptOutput, installerName),
+      join(output, installerName),
+    );
     break;
   } catch (error) {
     // Windows scanners can briefly lock resources while they are being copied.

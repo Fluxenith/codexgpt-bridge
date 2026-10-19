@@ -36,10 +36,7 @@ assert.equal(smokeProvenance.productName, "CodexGPT Bridge Installer Smoke");
 assert.equal(smokeProvenance.version, packageMetadata.version);
 const stagingRoot = await mkdtemp(join(tmpdir(), "codexgpt-installer-smoke-"));
 const installDirectory = join(stagingRoot, "app");
-const installedExecutable = join(
-  installDirectory,
-  "CodexGPT Bridge Installer Smoke.exe",
-);
+const installedExecutable = join(installDirectory, "CodexGPT Bridge.exe");
 let uninstaller;
 
 function run(file, args) {
@@ -83,7 +80,7 @@ async function waitUntilMissing(path) {
 try {
   await run(installer, ["/S", `/D=${installDirectory}`]);
   const installedNames = await readdir(installDirectory);
-  assert.ok(installedNames.includes("CodexGPT Bridge Installer Smoke.exe"));
+  assert.ok(installedNames.includes("CodexGPT Bridge.exe"));
   uninstaller = installedNames.find(
     (name) => name.startsWith("Uninstall") && name.endsWith(".exe"),
   );

@@ -59,9 +59,12 @@ Security → Open Anyway**. Only allow the app if you trust its source. See
 
 You need Codex and a ChatGPT account with access to the models you want to use.
 Available models and usage limits depend on your account.
-Bridge depends on the ChatGPT Web interface, which may change. Review the
-applicable service terms and account requirements before use. Bridge does not
-guarantee continuous access or bypass account usage limits.
+Bridge automates a signed-in ChatGPT Web session and depends on an interface
+that may change. OpenAI's [Terms of Use](https://openai.com/policies/terms-of-use/)
+prohibit automatic or programmatic extraction of data or Output and
+circumventing rate limits. This integration may conflict with applicable terms;
+confirm that your use is authorized before trying it. Bridge cannot guarantee
+account safety, continuous access, or additional usage allowance.
 
 ## Get started
 
