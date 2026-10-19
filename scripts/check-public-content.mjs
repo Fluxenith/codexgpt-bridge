@@ -132,6 +132,8 @@ async function walk(directory = "") {
     withFileTypes: true,
   })) {
     const file = directory ? `${directory}/${entry.name}` : entry.name;
+    // A Git worktree stores its private Git metadata in a .git file.
+    if (file === ".git" && entry.isFile()) continue;
     if (entry.isDirectory() && generatedDirectories.has(entry.name)) continue;
     if (entry.isSymbolicLink()) {
       findings.add(`${file}: symbolic link`);
