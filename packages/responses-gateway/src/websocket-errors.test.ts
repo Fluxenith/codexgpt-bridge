@@ -112,7 +112,10 @@ it("wraps malformed events and unavailable models as HTTP 400 WebSocket errors",
       ["{", "invalid_json"],
       [JSON.stringify({ type: "unknown" }), "unsupported_event"],
       [
-        JSON.stringify({ type: "response.create", model: "unknown" }),
+        JSON.stringify({
+          type: "response.create",
+          model: "codexgpt-bridge/unknown",
+        }),
         "unsupported_bridge_web_model",
       ],
     ]) {
@@ -179,6 +182,213 @@ it("preserves server failures and draining status in the Codex WebSocket envelop
       "provider_draining",
     );
     assert.deepEqual(result.headers, { "retry-after": "5" });
+  } finally {
+    socket.terminate();
+    await gateway.close();
+  }
+});
+
+function sseResponse(events: readonly Record<string, unknown>[]): Response {
+  return new Response(
+    events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join(""),
+    { status: 200, headers: { "content-type": "text/event-stream" } },
+  );
+}
+
+function eventsUntilTerminal(
+  socket: WebSocket,
+): Promise<Record<string, unknown>[]> {
+  return new Promise((resolve, reject) => {
+    const events: Record<string, unknown>[] = [];
+    const timer = setTimeout(() => {
+      socket.off("message", onMessage);
+      reject(new Error(`No terminal event: ${JSON.stringify(events)}`));
+    }, 2_000);
+    const onMessage = (data: WebSocket.RawData): void => {
+      const event = JSON.parse(String(data)) as Record<string, unknown>;
+      events.push(event);
+      if (
+        event.type === "response.completed" ||
+        event.type === "response.failed" ||
+        event.type === "error"
+      ) {
+        clearTimeout(timer);
+        socket.off("message", onMessage);
+        resolve(events);
+      }
+    };
+    socket.on("message", onMessage);
+  });
+}
+
+it("forwards native models over WebSocket to the original provider and rebuilds history", async () => {
+  const calls: {
+    url: string;
+    headers: Headers;
+    body: Record<string, unknown>;
+  }[] = [];
+  const gateway = new ResponsesGateway({
+    port: 0,
+    upstreamBaseUrl: "http://upstream.test/backend-api/codex",
+    fetchImpl: (async (url: string | URL | Request, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      calls.push({
+        url: String(url),
+        headers: new Headers(init?.headers),
+        body,
+      });
+      const id = `resp_native_${calls.length}`;
+      const item = {
+        type: "message",
+        role: "assistant",
+        content: [{ type: "output_text", text: `answer ${calls.length}` }],
+      };
+      return sseResponse([
+        { type: "response.created", response: { id, status: "in_progress" } },
+        { type: "response.output_item.done", item },
+        { type: "response.completed", response: { id, status: "completed" } },
+      ]);
+    }) as typeof fetch,
+    runWebTurn: async () =>
+      assert.fail("Native models must not reach the browser."),
+  });
+  const socket = await connect(gateway);
+  try {
+    socket.send(
+      JSON.stringify({
+        type: "response.create",
+        model: "gpt-6.1-sol",
+        instructions: "be brief",
+        input: [{ role: "user", content: "first" }],
+      }),
+    );
+    const first = await eventsUntilTerminal(socket);
+    assert.deepEqual(
+      first.map((event) => event.type),
+      ["response.created", "response.output_item.done", "response.completed"],
+    );
+    assert.equal(
+      calls[0]!.url,
+      "http://upstream.test/backend-api/codex/responses",
+    );
+    assert.equal(calls[0]!.headers.get("authorization"), "Bearer test");
+    assert.equal(calls[0]!.headers.get("accept"), "text/event-stream");
+    assert.equal(calls[0]!.headers.get("sec-websocket-key"), null);
+    assert.equal(calls[0]!.headers.get("upgrade"), null);
+    assert.equal(calls[0]!.body.type, undefined);
+    assert.equal(calls[0]!.body.stream, true);
+    assert.equal(calls[0]!.body.model, "gpt-6.1-sol");
+
+    socket.send(
+      JSON.stringify({
+        type: "response.create",
+        model: "gpt-6.1-sol",
+        previous_response_id: "resp_native_1",
+        input: [{ role: "user", content: "second" }],
+      }),
+    );
+    const second = await eventsUntilTerminal(socket);
+    assert.equal(second.at(-1)!.type, "response.completed");
+    assert.equal(calls[1]!.body.previous_response_id, undefined);
+    assert.equal(calls[1]!.body.instructions, "be brief");
+    assert.deepEqual(calls[1]!.body.input, [
+      { role: "user", content: "first" },
+      {
+        type: "message",
+        role: "assistant",
+        content: [{ type: "output_text", text: "answer 1" }],
+      },
+      { role: "user", content: "second" },
+    ]);
+    assert.equal(gateway.lifecycleStatus().activeHttpTurns, 0);
+  } finally {
+    socket.terminate();
+    await gateway.close();
+  }
+});
+
+it("answers native WebSocket warm-ups locally and continues from them", async () => {
+  const bodies: Record<string, unknown>[] = [];
+  const gateway = new ResponsesGateway({
+    port: 0,
+    upstreamBaseUrl: "http://upstream.test",
+    fetchImpl: (async (_url: string | URL | Request, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
+      return sseResponse([
+        { type: "response.completed", response: { id: "resp_after_warmup" } },
+      ]);
+    }) as typeof fetch,
+    runWebTurn: async () =>
+      assert.fail("Native models must not reach the browser."),
+  });
+  const socket = await connect(gateway);
+  try {
+    socket.send(
+      JSON.stringify({
+        type: "response.create",
+        model: "gpt-6.1-sol",
+        generate: false,
+        input: [{ role: "user", content: "hello" }],
+      }),
+    );
+    const warmup = await eventsUntilTerminal(socket);
+    assert.equal(bodies.length, 0);
+    const completed = warmup.at(-1)!;
+    assert.equal(completed.type, "response.completed");
+    const warmupId = (completed.response as Record<string, unknown>).id;
+    socket.send(
+      JSON.stringify({
+        type: "response.create",
+        model: "gpt-6.1-sol",
+        previous_response_id: warmupId,
+        input: [],
+      }),
+    );
+    await eventsUntilTerminal(socket);
+    assert.equal(bodies.length, 1);
+    assert.equal(bodies[0]!.generate, undefined);
+    assert.deepEqual(bodies[0]!.input, [{ role: "user", content: "hello" }]);
+  } finally {
+    socket.terminate();
+    await gateway.close();
+  }
+});
+
+it("relays original provider HTTP errors for native WebSocket turns", async () => {
+  const gateway = new ResponsesGateway({
+    port: 0,
+    upstreamBaseUrl: "http://upstream.test",
+    fetchImpl: (async () =>
+      new Response(
+        JSON.stringify({
+          error: {
+            type: "usage_limit_reached",
+            code: "rate_limited",
+            message: "Slow down.",
+          },
+        }),
+        { status: 429 },
+      )) as typeof fetch,
+    runWebTurn: async () =>
+      assert.fail("Native models must not reach the browser."),
+  });
+  const socket = await connect(gateway);
+  try {
+    socket.send(
+      JSON.stringify({
+        type: "response.create",
+        model: "gpt-6.1-sol",
+        input: "hi",
+      }),
+    );
+    const [event] = await eventsUntilTerminal(socket);
+    assert.equal(event!.status, 429);
+    assert.deepEqual(event!.error, {
+      type: "usage_limit_reached",
+      code: "rate_limited",
+      message: "Slow down.",
+      param: null,
+    });
   } finally {
     socket.terminate();
     await gateway.close();

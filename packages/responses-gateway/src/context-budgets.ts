@@ -20,6 +20,7 @@ export function resolveBridgeRouteContextBudget(
   route: BridgeWebModelRoute,
   profile: BridgeAccountContextProfile = "compatibility",
 ): BridgeContextBudget {
+  if (route.contextBudget) return route.contextBudget;
   // A listed Pro route can recover while the installed account snapshot is old.
   // Its own transport budget must not promote the account's other model routes.
   const budget = resolveBridgeContextBudget(

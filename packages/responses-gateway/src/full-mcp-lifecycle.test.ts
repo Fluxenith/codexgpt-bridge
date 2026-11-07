@@ -5,7 +5,82 @@ import { it } from "node:test";
 import { FullTurnBroker } from "./full-turn-broker.js";
 import { FullTurnMcpServer } from "./full-turn-mcp-server.js";
 
-async function fixture(gatewayOnly = false) {
+it("native MCP flushes valid JSON whitespace before a slow tool result", async () => {
+  const broker = new FullTurnBroker();
+  const token = broker.register(
+    "native-heartbeat",
+    [
+      {
+        kind: "function",
+        wireName: "exec_command",
+        name: "exec_command",
+        description: "fixture",
+        parameters: { type: "object" },
+      },
+    ],
+    true,
+  );
+  const server = new FullTurnMcpServer(broker);
+  const address = await server.start();
+  try {
+    const init = await fetch(address.url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "initialize",
+        params: {},
+      }),
+    });
+    const session = init.headers.get("mcp-session-id")!;
+    await init.json();
+    const response = await fetch(address.url, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "mcp-session-id": session,
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: "slow",
+        method: "tools/call",
+        params: {
+          name: "codex_exec",
+          arguments: { turn_token: token, cmd: "fixture" },
+        },
+      }),
+      signal: AbortSignal.timeout(5000),
+    });
+    const reader = response.body!.getReader();
+    const first = (await reader.read()).value!;
+    assert.match(Buffer.from(first).toString(), /^\s+$/u);
+    const [call] = await broker.nextBatch(token, AbortSignal.timeout(3000));
+    broker.complete(token, call!.callId, {
+      content: [{ type: "text", text: "completed after native approval" }],
+    });
+    const chunks = [first];
+    for (;;) {
+      const item = await reader.read();
+      if (item.done) break;
+      chunks.push(item.value);
+    }
+    const result = JSON.parse(Buffer.concat(chunks).toString()) as {
+      id: string;
+      result: { content: { text: string }[] };
+    };
+    assert.equal(result.id, "slow");
+    assert.equal(
+      result.result.content[0]!.text,
+      "completed after native approval",
+    );
+  } finally {
+    await server.close();
+    broker.close();
+  }
+});
+
+async function fixture(gatewayOnly = false, toolWaitMs?: number) {
   const broker = new FullTurnBroker();
   const token = broker.register(
     "rpc-fixture",
@@ -57,6 +132,9 @@ async function fixture(gatewayOnly = false) {
       headers: {
         "content-type": "application/json",
         "mcp-session-id": session,
+        ...(toolWaitMs === undefined
+          ? {}
+          : { "x-bridge-tool-wait-ms": String(toolWaitMs) }),
       },
       body: JSON.stringify(body),
       ...(signal ? { signal } : {}),
@@ -83,6 +161,58 @@ async function fixture(gatewayOnly = false) {
     );
   return { broker, token, server, send, call };
 }
+
+it("long tools return one task-owned receipt and retain their genuine result across polling and RPC replay", async () => {
+  const f = await fixture(false, 20);
+  try {
+    const pending = (await f.call("slow-owned-call")) as {
+      result: { structuredContent: { status: string; operation_id: string } };
+    };
+    const receipt = pending.result.structuredContent;
+    assert.equal(receipt.status, "pending");
+    const [call] = await f.broker.nextBatch(f.token, AbortSignal.timeout(3000));
+    assert.equal(f.broker.outstanding(f.token).length, 1);
+    assert.deepEqual(await f.call("slow-owned-call"), pending);
+    const poll = (token: string, id: string) =>
+      f.send({
+        jsonrpc: "2.0",
+        id,
+        method: "tools/call",
+        params: {
+          name: "codex_wait_tool_result",
+          arguments: { turn_token: token, operation_id: receipt.operation_id },
+        },
+      });
+    const other = f.broker.register("other-receipt-task", [], true);
+    assert.equal(
+      ((await poll(other, "foreign")) as { result: { isError: boolean } })
+        .result.isError,
+      true,
+    );
+    f.broker.complete(f.token, call!.callId, {
+      content: [{ type: "text", text: "genuine native file value" }],
+    });
+    await delay(0);
+    assert.equal(f.broker.hasPendingTools(f.token), true);
+    assert.equal(f.broker.commitCompletion(f.token), false);
+    const value = (await poll(f.token, "poll-1")) as {
+      result: { content: { text: string }[] };
+    };
+    assert.equal(value.result.content[0]!.text, "genuine native file value");
+    assert.deepEqual((await poll(f.token, "poll-2")).result, value.result);
+    assert.equal(f.broker.outstanding(f.token).length, 0);
+    assert.equal(f.broker.hasPendingTools(f.token), false);
+    f.broker.revoke(f.token);
+    assert.equal(
+      ((await poll(f.token, "revoked")) as { result: { isError: boolean } })
+        .result.isError,
+      true,
+    );
+  } finally {
+    await f.server.close();
+    f.broker.close();
+  }
+});
 
 async function receivedCommandBudget(request: {
   readonly arguments?: unknown;

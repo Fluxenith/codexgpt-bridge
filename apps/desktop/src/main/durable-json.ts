@@ -1,6 +1,29 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
+
+async function renameWithSharingRetry(
+  source: string,
+  destination: string,
+): Promise<void> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await rename(source, destination);
+      return;
+    } catch (error) {
+      if (
+        process.platform !== "win32" ||
+        attempt >= 9 ||
+        !["EPERM", "EACCES", "EBUSY"].includes(
+          (error as NodeJS.ErrnoException).code ?? "",
+        )
+      )
+        throw error;
+      await delay(20 * (attempt + 1));
+    }
+  }
+}
 
 /** Callers serialize writes. Flush the new state and retain the previous valid JSON. */
 export async function writeDurableJson(
@@ -31,9 +54,9 @@ export async function writeDurableJson(
         mode: 0o600,
         flush: true,
       });
-      await rename(backupTemporary, backup);
+      await renameWithSharingRetry(backupTemporary, backup);
     }
-    await rename(temporary, file);
+    await renameWithSharingRetry(temporary, file);
   } finally {
     await rm(temporary, { force: true });
     await rm(backupTemporary, { force: true });

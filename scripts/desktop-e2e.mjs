@@ -342,7 +342,7 @@ function fakeChatGptHtml(nativeToolSelected = false) {
           const message = document.createElement('div');
           message.setAttribute('data-message-author-role', 'assistant');
           message.setAttribute('data-message-id', responseId);
-          const imageAttached = Boolean(document.querySelector('.composer-attachment-surface[aria-label="codex-input-image-1.png"]'));
+          const imageAttached = Boolean(document.querySelector('.composer-attachment-surface[aria-label^="codex-input-image-1-"][aria-label$=".png"]'));
           const bridgeClientTool = prompt.includes('custom_client__open_workspace');
           const transientImageFailure = prompt.includes('provider-transient-image-failure-e2e');
           const transientImageRetry = window.__providerPendingImageRetry

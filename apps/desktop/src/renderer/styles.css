@@ -131,6 +131,62 @@ button.ghost {
   margin-top: 18px;
 }
 
+.providerSwitch {
+  display: flex;
+  gap: 8px;
+  margin: 18px 0 12px;
+}
+.providerSwitch button[aria-pressed="true"] {
+  border-color: #7e91ec;
+  background: #283154;
+  color: #fff;
+}
+.geminiSettings {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin: 18px 0;
+}
+.geminiSettings label {
+  display: grid;
+  gap: 8px;
+  color: #bbc1d0;
+  font-size: 13px;
+}
+.geminiSettings input {
+  min-width: 0;
+  width: 100%;
+  border: 1px solid #30333b;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #0f1117;
+  color: #e8eaf0;
+  font: inherit;
+}
+.geminiSettings button {
+  justify-self: start;
+}
+.geminiModels {
+  overflow-x: auto;
+}
+.geminiModels table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 18px;
+}
+.geminiModels th,
+.geminiModels td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid #2a3041;
+  color: #c8cedd;
+}
+@media (max-width: 700px) {
+  .geminiSettings {
+    grid-template-columns: 1fr;
+  }
+}
+
 .updateNotice {
   display: flex;
   justify-content: space-between;

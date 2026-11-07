@@ -194,6 +194,9 @@ export class ChromeChatGptHost {
           "--remote-debugging-address=127.0.0.1",
           "--remote-debugging-port=0",
           "--disable-background-mode",
+          "--disable-background-timer-throttling",
+          "--disable-backgrounding-occluded-windows",
+          "--disable-renderer-backgrounding",
           "--no-first-run",
           "--no-default-browser-check",
           "--no-startup-window",
@@ -276,6 +279,15 @@ export class ChromeChatGptHost {
     window.on("closed", () => this.#windows.delete(window));
     if (options.show) window.show();
     return window;
+  }
+
+  /** Reuse the same isolated Chrome lifecycle for another Web provider. */
+  async createPage(purpose: "login" | "turn" = "turn"): Promise<Page> {
+    const window = await this.createWindow(
+      { show: true, width: 1280, height: 900 },
+      purpose,
+    );
+    return (window as ChromeChatGptWindow).page;
   }
 
   async close(): Promise<void> {

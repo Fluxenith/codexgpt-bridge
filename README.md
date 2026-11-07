@@ -232,6 +232,30 @@ pnpm install --frozen-lockfile
 pnpm desktop
 ```
 
+## Gemini Web (experimental)
+
+Bridge can also connect a signed-in Gemini Web account to Codex. It uses your
+Gemini Web login and usage limits; no API key is needed.
+
+1. In Bridge, open the **Gemini** page and choose **Enable Gemini Web**.
+2. Choose **Open Gemini sign-in** and sign in inside Bridge's Gemini browser.
+   You can keep that browser open.
+3. Choose **Continue and discover models** to find the models and thinking
+   levels available to your account.
+4. Choose **Add Gemini models to Codex**, restart Codex and pick a
+   `gemini-web/` model.
+
+Simple mode works without extra setup. Full MCP also needs a fixed public HTTPS
+address and a custom app connected in Gemini's English interface.
+
+Gemini support currently covers text and Codex tools. Attachments, media,
+Canvas, Deep Research, notebooks and subagents are not supported yet. Bridge
+does not resend a request automatically if Gemini fails.
+
+Bridge automates a signed-in Gemini Web session and depends on an interface
+that may change. Review Google's [Terms of Service](https://policies.google.com/terms)
+and Gemini policies before use; this integration may conflict with them.
+
 ## Third-party notices
 
 Dependency licenses are included in [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt)

@@ -397,7 +397,7 @@ export function observeModelSelection(
     )[0];
     const controls = new Set(
       all(
-        '[data-testid="model-switcher-dropdown-button"], [data-testid="composer-model-picker-button"]',
+        '[data-testid="model-switcher-dropdown-button"], [data-testid="composer-model-picker-button"], [data-composer-navigation-target="reasoning"][data-selected-reasoning-effort][aria-haspopup="menu"]',
       ),
     );
     // Some composer pickers expose data-tone instead of a test id. Restrict this

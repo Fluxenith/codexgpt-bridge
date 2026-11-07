@@ -6,6 +6,7 @@ export type PreparationFailureCode =
   | "model-selection-disabled"
   | "model-selection-mismatch"
   | "full-mcp-connector-unavailable"
+  | "full-mcp-temporary-connector-unavailable"
   | "native-tool-selection-active";
 
 export type OperationFailureCode =

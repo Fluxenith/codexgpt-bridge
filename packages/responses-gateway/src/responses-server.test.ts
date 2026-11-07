@@ -282,6 +282,7 @@ describe("ResponsesGateway", () => {
       assert.deepEqual(
         catalog.result.tools.map((tool) => tool.name),
         [
+          "codex_wait_tool_result",
           "codex_exec",
           "codex_write_stdin",
           "codex_apply_patch",

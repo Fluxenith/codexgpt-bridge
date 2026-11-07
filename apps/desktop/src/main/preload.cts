@@ -1,4 +1,10 @@
 import { contextBridge, ipcRenderer } from "electron";
+import type { GeminiSettings, GeminiStatus } from "./gemini-types.js" with {
+  "resolution-mode": "import",
+};
+export type { GeminiSettings, GeminiStatus } from "./gemini-types.js" with {
+  "resolution-mode": "import",
+};
 import type { ChatGptProjectSettings } from "./chatgpt-project-types.js" with {
   "resolution-mode": "import",
 };
@@ -59,6 +65,7 @@ export interface FullMcpStatus {
 }
 
 export interface WebProviderStatus {
+  readonly gemini?: GeminiStatus;
   readonly developmentProfile?: boolean;
   readonly subagents?: {
     activeTurns: number;
@@ -152,6 +159,22 @@ ipcRenderer.on("update:focus", () => {
 });
 
 const desktopApi = {
+  setGeminiSettings: (value: Partial<GeminiSettings>): Promise<GeminiStatus> =>
+    ipcRenderer.invoke("gemini:settings", value) as Promise<GeminiStatus>,
+  openGeminiLogin: (): Promise<GeminiStatus> =>
+    ipcRenderer.invoke("gemini:login") as Promise<GeminiStatus>,
+  continueGeminiLogin: (): Promise<GeminiStatus> =>
+    ipcRenderer.invoke("gemini:login-continue") as Promise<GeminiStatus>,
+  discoverGemini: (): Promise<GeminiStatus> =>
+    ipcRenderer.invoke("gemini:discover") as Promise<GeminiStatus>,
+  installGeminiModels: (): Promise<WebProviderStatus> =>
+    ipcRenderer.invoke("gemini:install") as Promise<WebProviderStatus>,
+  copyGeminiPairingCode: (): Promise<void> =>
+    ipcRenderer.invoke("gemini:copy-pairing") as Promise<void>,
+  cancelGemini: (): Promise<GeminiStatus> =>
+    ipcRenderer.invoke("gemini:cancel") as Promise<GeminiStatus>,
+  showGeminiWindow: (): Promise<GeminiStatus> =>
+    ipcRenderer.invoke("gemini:show-window") as Promise<GeminiStatus>,
   onUpdateFocus: (listener: () => void): (() => void) => {
     updateFocusListeners.add(listener);
     if (updateFocusPending) {

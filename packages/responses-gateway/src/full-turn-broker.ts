@@ -82,6 +82,7 @@ interface TurnChannel {
   readonly subagentLimit?: number;
   readonly invocations: Map<string, Invocation>;
   readonly completedResults: Map<string, string>;
+  readonly resultReceipts: Set<string>;
   readonly queued: string[];
   readonly delivered: Set<string>;
   readonly replayableInvocations: Map<string, ReplayableInvocation>;
@@ -532,6 +533,7 @@ export class FullTurnBroker {
         : { subagentLimit: options.subagentLimit }),
       invocations: new Map(),
       completedResults: new Map(),
+      resultReceipts: new Set(),
       queued: [],
       delivered: new Set(),
       replayableInvocations: new Map(),
@@ -577,6 +579,20 @@ export class FullTurnBroker {
         0,
       ),
     };
+  }
+
+  hasPendingTools(turnToken: string): boolean {
+    const channel = this.#channels.get(turnToken);
+    return (
+      !!channel &&
+      (channel.invocations.size > 0 || channel.resultReceipts.size > 0)
+    );
+  }
+  holdToolResult(turnToken: string, receipt: string): void {
+    this.#channel(turnToken).resultReceipts.add(receipt);
+  }
+  releaseToolResult(turnToken: string, receipt: string): void {
+    this.#channels.get(turnToken)?.resultReceipts.delete(receipt);
   }
 
   inventory(
@@ -1134,7 +1150,7 @@ export class FullTurnBroker {
 
   hasPending(turnToken: string): boolean {
     const channel = this.#channel(turnToken, true);
-    return channel.invocations.size > 0;
+    return channel.invocations.size > 0 || channel.resultReceipts.size > 0;
   }
 
   isActive(turnToken: string): boolean {
@@ -1173,7 +1189,8 @@ export class FullTurnBroker {
     if (
       channel.invocations.size > 0 ||
       channel.queued.length > 0 ||
-      channel.nativeCells.size > 0
+      channel.nativeCells.size > 0 ||
+      channel.resultReceipts.size > 0
     )
       return false;
     channel.completionCommitted = true;

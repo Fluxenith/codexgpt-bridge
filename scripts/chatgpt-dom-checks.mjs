@@ -73,6 +73,13 @@ export async function runChatGptDomChecks(app) {
       '<div role="dialog">Intelligence Model<button role="combobox">5.6</button><button role="radio" aria-checked="true">Pro</button><button role="combobox">Standard</button></div>',
     );
     assert.equal((await observeModel()).mode, "pro");
+    // 2026-10-29 inline trigger: localized label, no test ID.
+    await setHtml(
+      '<button type="button" data-composer-navigation-target="reasoning" data-selected-reasoning-effort="high" aria-haspopup="menu" aria-controls="picker" aria-label="选择 ChatGPT 模型">High</button>',
+    );
+    selection = await observeModel();
+    assert.equal(selection.mode, "high");
+    assert.notEqual(selection.surface, "missing");
     await setHtml(
       '<button data-testid="model-switcher-dropdown-button">High</button><button data-testid="composer-model-picker-button">Medium</button>',
     );

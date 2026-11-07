@@ -270,16 +270,50 @@ it("discovers and invokes exact native MCP tools through a namespaced outer exec
     ]);
     assert.equal(calls, 1);
 
-    const undiscovered = await call("codex_tool_call", {
+    // An unlisted tool on another turn triggers one exact lookup in that
+    // turn's live registry; a tool missing there is still rejected.
+    const undiscoveredResponse = call("codex_tool_call", {
       turn_token: other,
       wire_name: "mcp__fixture__read",
       arguments: {},
     });
+    const [lookup] = await broker.nextBatch(other);
+    assert.equal(lookup!.wireName, "functions__exec");
+    broker.complete(other, lookup!.callId, await execute(lookup!, [], {}));
+    const undiscovered = await undiscoveredResponse;
     assert.equal(undiscovered.result.isError, true);
     assert.match(
       String(undiscovered.result.content[0]!.text),
       /Discover the exact/u,
     );
+
+    // When the tool exists, the lookup grants it and the call proceeds
+    // without the model spending a separate inventory step.
+    const autoResponse = call("codex_tool_call", {
+      turn_token: other,
+      wire_name: "mcp__fixture__read",
+      arguments: { path: "auto" },
+    });
+    const [autoLookup] = await broker.nextBatch(other);
+    broker.complete(
+      other,
+      autoLookup!.callId,
+      await execute(autoLookup!, registry, {}),
+    );
+    const [autoInvocation] = await broker.nextBatch(other);
+    broker.complete(
+      other,
+      autoInvocation!.callId,
+      await execute(autoInvocation!, registry, {
+        mcp__fixture__read: (args) => {
+          calls++;
+          assert.equal((args as { path: string }).path, "auto");
+          return { content: [{ type: "text", text: "auto-read" }] };
+        },
+      }),
+    );
+    assert.match(JSON.stringify((await autoResponse).result), /auto-read/u);
+    assert.equal(calls, 2);
 
     const removed = call("codex_tool_call", {
       turn_token: token,
@@ -300,7 +334,7 @@ it("discovers and invokes exact native MCP tools through a namespaced outer exec
       content: [{ type: "text", text: "Native registry changed" }],
     });
     assert.equal((await removed).result.isError, true);
-    assert.equal(calls, 1);
+    assert.equal(calls, 2);
 
     const command = call("codex_exec", {
       turn_token: token,

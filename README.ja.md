@@ -67,6 +67,27 @@ pnpm install --frozen-lockfile
 pnpm desktop
 ```
 
+## Gemini Web（実験的機能）
+
+Bridge はログイン済みの Gemini Web アカウントを Codex に接続することもできます。
+Gemini Web のアカウントと利用枠を使用し、API キーは不要です。
+
+1. Bridge で **Gemini** ページを開き、**Gemini Web を有効化** を選びます。
+2. **Gemini のログインを開く** を選び、Bridge 内蔵の Gemini ブラウザでログインします。ブラウザは開いたままで構いません。
+3. **続行してモデルを確認** を選び、アカウントで使えるモデルと思考レベルを確認します。
+4. **Gemini モデルを Codex に追加** を選び、Codex を再起動して `gemini-web/` で始まるモデルを選びます。
+
+Simple モードは追加設定なしで使えます。Full MCP には固定の公開 HTTPS アドレスと、
+Gemini の英語 UI で接続したカスタムアプリが必要です。
+
+現在 Gemini はテキストと Codex ツールに対応しています。添付ファイル、メディア、
+Canvas、Deep Research、ノートブック、サブエージェントには未対応です。
+Gemini でエラーが起きても、Bridge は要求を自動で再送しません。
+
+Bridge はログイン済みの Gemini Web を自動操作するため、画面の変更で動かなくなる
+ことがあります。利用前に Google の[利用規約](https://policies.google.com/terms)と
+Gemini のポリシーを確認してください。この連携はそれらに抵触する可能性があります。
+
 ## サードパーティーのライセンス
 
 依存パッケージのライセンスは [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt)

@@ -1,6 +1,49 @@
 import type { DesktopSettings } from "../main/preload.cjs";
 
 const en = {
+  webProviderSelect: "Web provider",
+  geminiHeading: "Gemini Web · experimental",
+  geminiEnable: "Enable Gemini Web",
+  geminiHelp:
+    "Uses your Gemini Web account and quota. After installing these models, select a Gemini model in Codex.",
+  geminiLogin: "Open Gemini sign-in",
+  geminiLoginHelp:
+    "Sign in inside the Bridge Gemini browser, then choose Continue. You can keep the browser open. Custom apps use Gemini's English interface.",
+  geminiContinue: "Continue and discover models",
+  geminiDiscover: "Refresh capabilities",
+  geminiDiscovering: "Checking the account and selectable model combinations…",
+  geminiInstall: "Add Gemini models to Codex",
+  geminiShowWindow: "Show Gemini window",
+  geminiPublicOrigin: "Fixed HTTPS origin for Gemini MCP",
+  geminiConnector: "Gemini custom app name",
+  geminiTextTimeout: "Generation timeout (seconds)",
+  geminiToolTimeout: "Separate tool-wait timeout (minutes)",
+  geminiMaxConcurrent: "Max concurrent Gemini tasks (1-4, one window each)",
+  geminiSaved: "Gemini settings and capabilities saved.",
+  geminiCopyPairing: "Copy a new pairing code",
+  geminiPairingCopied:
+    "Pairing code copied. Paste it only into your Bridge authorization page; it expires in 10 minutes.",
+  geminiModels: "Selectable combinations: {count}",
+  geminiModel: "Model",
+  geminiThinking: "Thinking level",
+  geminiTransport: "Codex tool connection",
+  geminiNativeReady: "Local Gemini MCP ingress is running",
+  geminiNativeOffline: "Local Gemini MCP ingress is not running",
+  geminiAutoApprove:
+    "Automatically accept Gemini tool confirmations for the current Codex task; Codex still owns tool permissions and approvals",
+  geminiFreshConversation: "New Gemini conversation for each Codex turn",
+  geminiSimpleTemporary: "Use Gemini Temporary Chat for Simple turns",
+  geminiSimpleTemporaryHelp:
+    "Each Simple request starts a new verified temporary chat and sends the required Codex context. Bridge does not save its Gemini conversation URL. Local Codex history and Bridge recovery records remain. Full MCP continues using ordinary chats.",
+  geminiNotebookMapping:
+    "Put new tasks in a same-named Gemini notebook (create it if missing)",
+  geminiNotebookMappingHelp:
+    "For a new Gemini task inside a Codex project, Bridge finds or creates the Gemini notebook with the Codex sidebar project name and starts the chat there, so it stays out of the main chat list. Tasks outside a project, temporary chats and existing conversations are unchanged. If the notebook cannot be found, created or verified, Bridge stops instead of using a normal chat.",
+  geminiLoginVerified: "Gemini account verified",
+  geminiPendingFeatures:
+    "Currently integrated: text and Codex tools. Attachments, media, Canvas, Research, notebooks and Gemini subagent scheduling are still pending. A selectable combination does not mean it has passed task acceptance.",
+  geminiCatalogInstalled:
+    "Gemini models added. Restart Codex to load the updated model catalog.",
   manualStageAck:
     "Paste ChatGPT's exact BRIDGE_CONTEXT_ACK reply after confirming Sent",
   manualAckNext: "Confirm acknowledgement and show next part",
@@ -42,8 +85,8 @@ const en = {
   simplifiedChinese: "简体中文",
   japanese: "日本語",
   korean: "한국어",
-  heroEyebrow: "CHATGPT WEB MODELS FOR CODEX",
-  heroSubtitle: "Bring ChatGPT Web models into Codex.",
+  heroEyebrow: "WEB MODELS FOR CODEX",
+  heroSubtitle: "Bring ChatGPT and Gemini Web models into Codex.",
   providerOnline: "Web provider online",
   providerOffline: "Web provider offline",
   providerHeading: "WEB MODEL PROVIDER",
@@ -273,6 +316,47 @@ type Catalog = Record<MessageKey, string>;
 
 const zhTW: Catalog = {
   ...en,
+  webProviderSelect: "Web 模型供應者",
+  geminiHeading: "Gemini Web・實驗功能",
+  geminiEnable: "啟用 Gemini Web",
+  geminiHelp:
+    "使用你的 Gemini 網頁版帳號與額度。加入模型後，可在 Codex 選擇 Gemini 模型。",
+  geminiLogin: "開啟 Gemini 登入",
+  geminiLoginHelp:
+    "在 Bridge 內建的 Gemini 瀏覽器登入，再按「繼續」，不必關閉瀏覽器。自訂應用程式使用 Gemini 英文介面。",
+  geminiContinue: "繼續並探索模型",
+  geminiDiscover: "更新能力清單",
+  geminiDiscovering: "正在確認帳號及實際可選的模型組合…",
+  geminiInstall: "將 Gemini 模型加入 Codex",
+  geminiShowWindow: "顯示 Gemini 視窗",
+  geminiPublicOrigin: "Gemini MCP 固定 HTTPS 網域來源",
+  geminiConnector: "Gemini 自訂應用程式名稱",
+  geminiTextTimeout: "生成逾時（秒）",
+  geminiToolTimeout: "獨立工具等待期限（分鐘）",
+  geminiMaxConcurrent: "Gemini 同時執行任務上限（1–4，各用一個視窗）",
+  geminiSaved: "已儲存 Gemini 設定與能力。",
+  geminiCopyPairing: "複製新的配對碼",
+  geminiPairingCopied: "已複製配對碼。僅貼到你的 Bridge 授權頁；十分鐘後失效。",
+  geminiModels: "實際可選組合：{count}",
+  geminiModel: "模型",
+  geminiThinking: "思考程度",
+  geminiTransport: "Codex 工具連線",
+  geminiNativeReady: "本機 Gemini MCP 入口運作中",
+  geminiNativeOffline: "本機 Gemini MCP 入口尚未運作",
+  geminiAutoApprove:
+    "自動確認目前 Codex 任務的 Gemini 工具提示；工具權限與審批仍由 Codex 管理",
+  geminiFreshConversation: "每個 Codex 回合建立新的 Gemini 對話",
+  geminiSimpleTemporary: "Simple 模式使用 Gemini 暫時對話",
+  geminiSimpleTemporaryHelp:
+    "每次 Simple 請求建立已確認的暫時對話，並同步所需 Codex 上下文。Bridge 不儲存該 Gemini 對話網址；本機 Codex 歷史與 Bridge 恢復紀錄仍保留。Full MCP 維持使用一般對話。",
+  geminiNotebookMapping: "新任務放進同名的 Gemini 筆記本（沒有就自動建立）",
+  geminiNotebookMappingHelp:
+    "在 Codex 專案裡開新的 Gemini 任務時，Bridge 會找到或建立與 Codex 側欄專案同名的 Gemini 筆記本，並在裡面開對話，不會塞滿一般對話列表。專案外的任務、臨時對話和既有對話不受影響。找不到、建不出或無法確認筆記本時，Bridge 會停下來報錯，不會改用一般對話。",
+  geminiLoginVerified: "已確認 Gemini 帳號",
+  geminiPendingFeatures:
+    "目前已接入文字與 Codex 工具。附件、媒體、Canvas、研究、筆記本及 Gemini 子代理排程仍待完成；選單可選不代表已通過實際任務驗收。",
+  geminiCatalogInstalled:
+    "已加入 Gemini 模型。請重新啟動 Codex 載入更新後的模型清單。",
   manualStageAck: "確認送出後，貼上 ChatGPT 回覆的完整 BRIDGE_CONTEXT_ACK",
   manualAckNext: "確認回執並顯示下一段",
   advancedHeading: "進階設定",
@@ -311,8 +395,8 @@ const zhTW: Catalog = {
   simplifiedChinese: "简体中文",
   japanese: "日本語",
   korean: "한국어",
-  heroEyebrow: "CODEX 的 CHATGPT WEB 模型",
-  heroSubtitle: "把 ChatGPT Web 模型帶進 Codex。",
+  heroEyebrow: "CODEX 的 WEB 模型",
+  heroSubtitle: "把 ChatGPT 與 Gemini 網頁版模型帶進 Codex。",
   providerOnline: "Web provider 已上線",
   providerOffline: "Web provider 未上線",
   providerHeading: "WEB 模型 PROVIDER",
@@ -527,6 +611,48 @@ const zhTW: Catalog = {
 
 const zhCN: Catalog = {
   ...en,
+  webProviderSelect: "Web 模型提供方",
+  geminiHeading: "Gemini Web・实验功能",
+  geminiEnable: "启用 Gemini Web",
+  geminiHelp:
+    "使用你的 Gemini 网页版账号与额度。添加模型后，可在 Codex 中选择 Gemini 模型。",
+  geminiLogin: "打开 Gemini 登录",
+  geminiLoginHelp:
+    "在 Bridge 内置的 Gemini 浏览器登录，再点击“继续”，无需关闭浏览器。自定义应用使用 Gemini 英文界面。",
+  geminiContinue: "继续并发现模型",
+  geminiDiscover: "刷新能力列表",
+  geminiDiscovering: "正在确认账号及实际可选的模型组合…",
+  geminiInstall: "将 Gemini 模型添加到 Codex",
+  geminiShowWindow: "显示 Gemini 窗口",
+  geminiPublicOrigin: "Gemini MCP 固定 HTTPS 来源",
+  geminiConnector: "Gemini 自定义应用名称",
+  geminiTextTimeout: "生成超时（秒）",
+  geminiToolTimeout: "独立工具等待期限（分钟）",
+  geminiMaxConcurrent: "Gemini 同时执行任务上限（1–4，各用一个窗口）",
+  geminiSaved: "已保存 Gemini 设置与能力。",
+  geminiCopyPairing: "复制新的配对码",
+  geminiPairingCopied:
+    "配对码已复制。仅粘贴到你的 Bridge 授权页；十分钟后失效。",
+  geminiModels: "实际可选组合：{count}",
+  geminiModel: "模型",
+  geminiThinking: "思考程度",
+  geminiTransport: "Codex 工具连接",
+  geminiNativeReady: "本地 Gemini MCP 入口运行中",
+  geminiNativeOffline: "本地 Gemini MCP 入口尚未运行",
+  geminiAutoApprove:
+    "自动确认当前 Codex 任务的 Gemini 工具提示；工具权限和审批仍由 Codex 管理",
+  geminiFreshConversation: "每个 Codex 回合创建新的 Gemini 对话",
+  geminiSimpleTemporary: "Simple 模式使用 Gemini 临时对话",
+  geminiSimpleTemporaryHelp:
+    "每次 Simple 请求创建已确认的临时对话，并同步所需 Codex 上下文。Bridge 不保存该 Gemini 对话网址；本地 Codex 历史与 Bridge 恢复记录仍保留。Full MCP 继续使用普通对话。",
+  geminiNotebookMapping: "新任务放进同名的 Gemini 笔记本（没有就自动创建）",
+  geminiNotebookMappingHelp:
+    "在 Codex 项目里开新的 Gemini 任务时，Bridge 会找到或创建与 Codex 侧栏项目同名的 Gemini 笔记本，并在里面开对话，不会塞满普通对话列表。项目外的任务、临时对话和已有对话不受影响。找不到、建不出或无法确认笔记本时，Bridge 会停下来报错，不会改用普通对话。",
+  geminiLoginVerified: "已确认 Gemini 账号",
+  geminiPendingFeatures:
+    "目前已接入文本与 Codex 工具。附件、媒体、Canvas、研究、笔记本及 Gemini 子代理调度尚未完成；菜单可选不代表已通过真实任务验收。",
+  geminiCatalogInstalled:
+    "Gemini 模型已添加。请重启 Codex 加载更新后的模型列表。",
   manualStageAck: "确认发送后，粘贴 ChatGPT 回复的完整 BRIDGE_CONTEXT_ACK",
   manualAckNext: "确认回执并显示下一段",
   advancedHeading: "高级设置",
@@ -565,8 +691,8 @@ const zhCN: Catalog = {
   simplifiedChinese: "简体中文",
   japanese: "日本語",
   korean: "한국어",
-  heroEyebrow: "CODEX 的 CHATGPT WEB 模型",
-  heroSubtitle: "把 ChatGPT Web 模型带进 Codex。",
+  heroEyebrow: "CODEX 的 WEB 模型",
+  heroSubtitle: "把 ChatGPT 和 Gemini 网页版模型带进 Codex。",
   providerOnline: "Web provider 已上线",
   providerOffline: "Web provider 未上线",
   providerHeading: "WEB 模型 PROVIDER",
@@ -780,6 +906,49 @@ const zhCN: Catalog = {
 
 const ja: Catalog = {
   ...en,
+  webProviderSelect: "Web プロバイダー",
+  geminiHeading: "Gemini Web・実験機能",
+  geminiEnable: "Gemini Web を有効化",
+  geminiHelp:
+    "Gemini Web のアカウントと利用枠を使用します。追加後、Codex で Gemini モデルを選択できます。",
+  geminiLogin: "Gemini のログインを開く",
+  geminiLoginHelp:
+    "Bridge 内蔵の Gemini ブラウザーでログインして「続行」を選択してください。ブラウザーを閉じる必要はありません。カスタムアプリでは Gemini の英語 UI を使用します。",
+  geminiContinue: "続行してモデルを確認",
+  geminiDiscover: "機能一覧を更新",
+  geminiDiscovering: "アカウントと選択可能なモデルの組み合わせを確認中…",
+  geminiInstall: "Gemini モデルを Codex に追加",
+  geminiShowWindow: "Gemini ウィンドウを表示",
+  geminiPublicOrigin: "Gemini MCP の固定 HTTPS オリジン",
+  geminiConnector: "Gemini カスタムアプリ名",
+  geminiTextTimeout: "生成タイムアウト（秒）",
+  geminiToolTimeout: "ツール待機の個別期限（分）",
+  geminiMaxConcurrent: "Gemini の同時実行タスク上限（1〜4、各 1 ウィンドウ）",
+  geminiSaved: "Gemini の設定と機能を保存しました。",
+  geminiCopyPairing: "新しいペアリングコードをコピー",
+  geminiPairingCopied:
+    "コードをコピーしました。Bridge の認可ページにのみ貼り付けてください。10 分で期限切れになります。",
+  geminiModels: "選択可能な組み合わせ：{count}",
+  geminiModel: "モデル",
+  geminiThinking: "思考レベル",
+  geminiTransport: "Codex ツール接続",
+  geminiNativeReady: "ローカル Gemini MCP 入口は実行中です",
+  geminiNativeOffline: "ローカル Gemini MCP 入口は停止しています",
+  geminiAutoApprove:
+    "現在の Codex タスクの Gemini ツール確認を自動承認します。ツールの権限と承認は Codex が管理します",
+  geminiFreshConversation: "Codex の各ターンで新しい Gemini 会話を作成",
+  geminiSimpleTemporary: "Simple モードで Gemini の一時チャットを使用",
+  geminiSimpleTemporaryHelp:
+    "各 Simple リクエストで一時チャットを確認して開始し、必要な Codex コンテキストを同期します。Gemini の会話 URL は保存しません。ローカルの Codex 履歴と Bridge の復旧記録は残ります。Full MCP は通常のチャットを使用します。",
+  geminiNotebookMapping:
+    "新しいタスクを同名の Gemini ノートブックに入れる（なければ作成）",
+  geminiNotebookMappingHelp:
+    "Codex プロジェクト内で新しい Gemini タスクを始めると、Bridge は Codex サイドバーのプロジェクト名と同じ Gemini ノートブックを探すか作成し、その中でチャットを始めます。通常のチャット一覧には並びません。プロジェクト外のタスク、一時チャット、既存の会話は変わりません。ノートブックを見つけられない・作成できない・確認できない場合は、通常のチャットに切り替えずに停止します。",
+  geminiLoginVerified: "Gemini アカウントを確認済み",
+  geminiPendingFeatures:
+    "現在はテキストと Codex ツールに対応しています。添付、メディア、Canvas、調査、ノートブック、Gemini のサブエージェント調整は未完了です。選択可能であっても実タスクの検証済みとは限りません。",
+  geminiCatalogInstalled:
+    "Gemini モデルを追加しました。Codex を再起動して一覧を読み込んでください。",
   manualStageAck:
     "送信確認後、ChatGPT の正確な BRIDGE_CONTEXT_ACK を貼り付ける",
   manualAckNext: "受領確認を検証して次の部分を表示",
@@ -814,8 +983,8 @@ const ja: Catalog = {
   manualAnswerLabel: "ChatGPT の最終回答を貼り付ける",
   manualAnswerSubmit: "回答を Codex に返す",
   language: "言語",
-  heroEyebrow: "CODEX 向け CHATGPT WEB モデル",
-  heroSubtitle: "ChatGPT Web モデルを Codex で利用します。",
+  heroEyebrow: "CODEX 向け WEB モデル",
+  heroSubtitle: "ChatGPT と Gemini の Web モデルを Codex で利用します。",
   providerOnline: "Web プロバイダーはオンラインです",
   providerOffline: "Web プロバイダーはオフラインです",
   providerHeading: "WEB モデルプロバイダー",
@@ -1040,6 +1209,49 @@ const ja: Catalog = {
 
 const ko: Catalog = {
   ...en,
+  webProviderSelect: "Web 제공자",
+  geminiHeading: "Gemini Web · 실험 기능",
+  geminiEnable: "Gemini Web 활성화",
+  geminiHelp:
+    "Gemini Web 계정과 사용량 한도를 사용합니다. 모델을 추가한 후 Codex에서 Gemini 모델을 선택하세요.",
+  geminiLogin: "Gemini 로그인 열기",
+  geminiLoginHelp:
+    "Bridge 내장 Gemini 브라우저에서 로그인한 다음 계속을 선택하세요. 브라우저를 닫을 필요는 없습니다. 맞춤 앱은 Gemini 영어 UI를 사용합니다.",
+  geminiContinue: "계속하여 모델 확인",
+  geminiDiscover: "기능 목록 새로 고침",
+  geminiDiscovering: "계정과 선택 가능한 모델 조합을 확인하는 중…",
+  geminiInstall: "Gemini 모델을 Codex에 추가",
+  geminiShowWindow: "Gemini 창 표시",
+  geminiPublicOrigin: "Gemini MCP 고정 HTTPS 오리진",
+  geminiConnector: "Gemini 맞춤 앱 이름",
+  geminiTextTimeout: "생성 시간 제한(초)",
+  geminiToolTimeout: "별도 도구 대기 시간 제한(분)",
+  geminiMaxConcurrent: "Gemini 동시 실행 작업 한도(1~4, 작업마다 창 1개)",
+  geminiSaved: "Gemini 설정과 기능을 저장했습니다.",
+  geminiCopyPairing: "새 페어링 코드 복사",
+  geminiPairingCopied:
+    "코드를 복사했습니다. Bridge 인증 페이지에만 붙여 넣으세요. 10분 후 만료됩니다.",
+  geminiModels: "선택 가능한 조합: {count}",
+  geminiModel: "모델",
+  geminiThinking: "생각 수준",
+  geminiTransport: "Codex 도구 연결",
+  geminiNativeReady: "로컬 Gemini MCP 입구가 실행 중입니다",
+  geminiNativeOffline: "로컬 Gemini MCP 입구가 실행되지 않습니다",
+  geminiAutoApprove:
+    "현재 Codex 작업의 Gemini 도구 확인을 자동 승인합니다. 도구 권한과 승인은 Codex가 계속 관리합니다",
+  geminiFreshConversation: "Codex 턴마다 새 Gemini 대화 만들기",
+  geminiSimpleTemporary: "Simple 모드에서 Gemini 임시 채팅 사용",
+  geminiSimpleTemporaryHelp:
+    "각 Simple 요청에서 확인된 새 임시 채팅을 시작하고 필요한 Codex 컨텍스트를 동기화합니다. Gemini 대화 URL은 저장하지 않습니다. 로컬 Codex 기록과 Bridge 복구 기록은 유지됩니다. Full MCP는 일반 채팅을 사용합니다.",
+  geminiNotebookMapping:
+    "새 작업을 같은 이름의 Gemini 노트북에 넣기(없으면 생성)",
+  geminiNotebookMappingHelp:
+    "Codex 프로젝트 안에서 새 Gemini 작업을 시작하면 Bridge가 Codex 사이드바 프로젝트와 같은 이름의 Gemini 노트북을 찾거나 만들어 그 안에서 채팅을 시작합니다. 일반 채팅 목록에는 쌓이지 않습니다. 프로젝트 밖 작업, 임시 채팅, 기존 대화는 바뀌지 않습니다. 노트북을 찾거나 만들거나 확인할 수 없으면 일반 채팅으로 바꾸지 않고 멈춥니다.",
+  geminiLoginVerified: "Gemini 계정을 확인했습니다",
+  geminiPendingFeatures:
+    "현재 텍스트와 Codex 도구를 지원합니다. 첨부, 미디어, Canvas, 연구, 노트북 및 Gemini 하위 에이전트 조정은 아직 완료되지 않았습니다. 선택 가능 여부는 실제 작업 검증 완료를 의미하지 않습니다.",
+  geminiCatalogInstalled:
+    "Gemini 모델을 추가했습니다. Codex를 다시 시작하여 새 목록을 불러오세요.",
   manualStageAck:
     "전송 확인 후 ChatGPT의 정확한 BRIDGE_CONTEXT_ACK 답변 붙여 넣기",
   manualAckNext: "수신 확인 후 다음 부분 표시",
@@ -1074,8 +1286,8 @@ const ko: Catalog = {
   manualAnswerLabel: "ChatGPT 최종 답변 붙여넣기",
   manualAnswerSubmit: "Codex에 답변 반환",
   language: "언어",
-  heroEyebrow: "CODEX용 CHATGPT WEB 모델",
-  heroSubtitle: "ChatGPT Web 모델을 Codex에서 사용합니다.",
+  heroEyebrow: "CODEX용 WEB 모델",
+  heroSubtitle: "ChatGPT와 Gemini Web 모델을 Codex에서 사용합니다.",
   providerOnline: "Web 공급자 온라인",
   providerOffline: "Web 공급자 오프라인",
   providerHeading: "WEB 모델 공급자",

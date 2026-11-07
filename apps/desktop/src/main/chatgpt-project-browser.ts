@@ -171,11 +171,12 @@ export class ChatGptProjectBrowser {
       );
     };
     const settledSearch = async (): Promise<ProjectSurface> => {
-      const deadline = Date.now() + 12_000;
+      let deadline = Date.now() + 12_000;
+      let recovered = false;
       let signature = "";
       let stableSince = Date.now();
-      let lastStatus = "";
-      while (Date.now() < deadline) {
+      let lastStatus: string;
+      for (;;) {
         const state = await act("inspect");
         lastStatus = state.searchStatus;
         if (!state.ready || state.signature !== signature) {
@@ -184,10 +185,27 @@ export class ChatGptProjectBrowser {
         } else if (Date.now() - stableSince >= 1_000) {
           return state;
         }
+        if (Date.now() >= deadline) {
+          // Retry only discovery, before any create/open click. Never interpret
+          // an unfinished list as absence, or replay an uncertain creation.
+          if (recovered) break;
+          recovered = true;
+          await window.loadURL(new URL("/projects", origin).href);
+          await probeChatGptServerSession(
+            this.baseUrl,
+            (url, init) => window.webContents.session.fetch(url, init),
+            signal,
+          );
+          await enterName("search");
+          signature = "";
+          stableSince = Date.now();
+          deadline = Date.now() + 25_000;
+        }
         await delay(150, signal);
       }
-      throw new Error(
+      throw new PreparationError(
         `ChatGPT 專案搜尋結果尚未更新完成，尚未建立專案或送出訊息。${lastStatus}`,
+        "timeout",
       );
     };
     const abort = (): void => {

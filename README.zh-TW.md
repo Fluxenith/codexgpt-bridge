@@ -214,6 +214,26 @@ pnpm install --frozen-lockfile
 pnpm desktop
 ```
 
+## Gemini Web（實驗功能）
+
+Bridge 也能把已登入的 Gemini 網頁版帳號接到 Codex，使用你 Gemini 網頁版的
+帳號與額度，不需要 API key。
+
+1. 在 Bridge 打開 **Gemini** 頁面，按 **啟用 Gemini Web**。
+2. 按 **開啟 Gemini 登入**，在 Bridge 內建的 Gemini 瀏覽器登入，不必關閉瀏覽器。
+3. 按 **繼續並探索模型**，找出你帳號可用的模型與思考等級。
+4. 按 **將 Gemini 模型加入 Codex**，重新啟動 Codex，選擇 `gemini-web/` 開頭的模型。
+
+Simple 模式不需要額外設定。Full MCP 另外需要固定的公開 HTTPS 網址，並在
+Gemini 英文介面連接自訂應用程式。
+
+目前 Gemini 支援文字與 Codex 工具；附件、媒體、Canvas、深度研究、筆記本與子代理
+尚未支援。Gemini 發生錯誤時，Bridge 不會自動重送請求。
+
+Bridge 會自動操作已登入的 Gemini 網頁，介面變動可能影響運作。使用前請先閱讀
+Google 的[服務條款](https://policies.google.com/terms)與 Gemini 相關政策；
+此整合方式可能與其衝突。
+
 ## 第三方授權
 
 依賴套件的授權保留在 [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt)

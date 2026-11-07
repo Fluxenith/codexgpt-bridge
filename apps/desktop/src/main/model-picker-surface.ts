@@ -48,6 +48,9 @@ export function modelPickerRoots(): Element[] {
     const dedicated =
       /^(?:model-switcher-dropdown-button|composer-model-picker-button)$/.test(
         button.getAttribute("data-testid") || "",
+      ) ||
+      button.matches(
+        '[data-composer-navigation-target="reasoning"][data-selected-reasoning-effort][aria-haspopup="menu"]',
       );
     const name = (
       button.textContent ||
