@@ -1,0 +1,108 @@
+# CodexGPT Bridge
+
+**ChatGPT 웹 모델을 Codex에서 사용하세요.**
+
+[English](README.md) · [繁體中文](README.zh-TW.md) · [简体中文](README.zh-CN.md) · [日本語](README.ja.md) · [한국어](README.ko.md)
+
+CodexGPT Bridge는 Codex를 로그인된 ChatGPT 웹 세션에 연결합니다.
+모델 선택, 작업별 대화, 이미지, 진행 상황 표시 및 취소를 지원합니다.
+프로젝트 파일, 도구 및 승인은 Codex에서 관리합니다.
+
+이 프로젝트는 독립적인 타사 프로젝트이며 OpenAI와 제휴 관계가 없습니다.
+
+GPT 플러그인 및 Full MCP 설정 안내: [English](README.md#chatgpt-plugin-setup) · [繁體中文](README.zh-TW.md#chatgpt-外掛設定).
+
+**v0.1.103:** Full MCP의 공식 Tunnel 클라이언트를 자동으로 다운로드하고 검증합니다. 경로는 비워 두세요. Tunnel 자격 증명과 플러그인 권한은 계속 필요합니다.
+
+## v0.1.104
+
+- **실험적 Gemini Web 지원:** 로그인한 계정에서 사용할 수 있는 모델과 사고 수준을 검색하여 Codex에 추가합니다.
+  Simple과 Full MCP는 별도의 Gemini 작업 대기열을 사용합니다.
+  로그인이나 확인이 필요할 때 창을 표시하며, 직접 열 수도 있습니다.
+- **네이티브 모델 호환성:** Codex 네이티브 모델의 Responses WebSocket 요청을 기존 공급자로 전달하고,
+  대화 기록과 상위 서버 오류를 유지합니다.
+- **ChatGPT 안정성:** 프로젝트 로딩 감지와 이미지 첨부 식별을 개선하고,
+  임시 채팅에서 지정한 Full MCP 앱을 사용할 수 없을 때 해결 방법을 안내합니다.
+- **Full MCP 및 Windows:** 도구 결과의 전달이 확인될 때까지 대기 상태를 유지하고, 변경되지 않은 도구 목록을 재사용합니다.
+  JSON 저장 중 Windows의 일시적인 파일 잠금도 재시도합니다.
+
+Gemini 설정과 현재 제한 사항은 아래의 Gemini Web 실험 기능 안내를 참조하세요.
+
+## 설치
+
+이 저장소의 **[Releases](https://github.com/Fluxenith/codexgpt-bridge/releases/latest)** 페이지에서 운영 체제에 맞는 설치 파일을 다운로드하세요.
+Windows는 `CodexGPT-Bridge-Setup-<버전>.exe`, macOS는 DMG,
+Linux는 AppImage 또는 DEB를 사용합니다.
+
+**macOS 테스트 빌드:** Intel 및 Apple Silicon 빌드는 Apple 공증을 받지 않았습니다.
+처음 실행을 시도한 후 **시스템 설정 → 개인정보 보호 및 보안 → 확인 없이 열기**에서
+허용해야 할 수 있습니다. 출처를 신뢰할 수 있는 경우에만 허용하세요.
+[Apple 안내](https://support.apple.com/ko-kr/102445)를 참고하세요.
+
+Codex가 설치되어 있어야 하며, 사용할 모델에 접근할 수 있는 ChatGPT 계정이 필요합니다.
+사용 가능한 모델과 사용 한도는 계정에 따라 다릅니다.
+
+## 시작하기
+
+1. Bridge를 열고 브라우저와 도구 연결 방식을 선택하세요.
+   처음 사용한다면 Simple이 가장 간편합니다. Full MCP는 커넥터와 tunnel 설정이 필요합니다.
+2. 'ChatGPT 로그인 열기'를 선택하고 로그인하세요. Chrome에서 로그인을 마쳤다면
+   Bridge로 돌아와 '로그인 완료, 계속'을 선택하세요.
+3. 'ChatGPT 연결 테스트'를 선택한 다음 'Web 모델 설치'를 선택하세요.
+4. Codex를 다시 시작하고 `CodexGPT Bridge — …` 모델을 선택하세요.
+
+모델을 사용하는 동안 Bridge를 계속 실행해 주세요.
+메인 창을 닫으면 시스템 트레이에 남아 있으며, '종료'를 선택하면 프로그램이 중지됩니다.
+'Web 모델 제거'는 Bridge가 관리하던 설정을 이전 상태로 복원합니다.
+
+인터페이스는 영어, 번체 중국어, 간체 중국어, 일본어 및 한국어를 지원합니다.
+'언어' 메뉴에서 전환할 수 있습니다.
+
+## 업데이트 및 문제 해결
+
+GitHub 릴리스 워크플로는 이 저장소의 업데이트 주소를 설치 파일에 포함합니다.
+사용자가 업데이트 주소를 직접 입력할 필요는 없습니다.
+Bridge는 시작 시와 백그라운드 실행 중에 새 버전을 확인합니다.
+온라인 업데이트를 사용하려면 업데이트 매니페스트와 설치 파일에 접근할 수 있어야 합니다.
+업데이트 소스를 아직 사용할 수 없다면 **[Releases](https://github.com/Fluxenith/codexgpt-bridge/releases/latest)**에서 새 버전을 다운로드하세요.
+
+연결에 실패하면 ChatGPT 로그인 상태를 확인한 뒤 Bridge의 **Doctor** 진단을 실행하세요.
+문제를 보고할 때는 앱 버전, 운영 체제 및 재현 단계를 포함하고,
+계정 정보, 개인 경로, 대화 내용 및 인증 정보를 제거해 주세요.
+
+로그인 데이터와 설정은 애플리케이션의 로컬 사용자 프로필에 저장됩니다.
+
+## 소스 코드에서 실행
+
+Node.js 22.20.0 이상과 pnpm 11.19.0을 사용하세요.
+
+```powershell
+pnpm install --frozen-lockfile
+pnpm desktop
+```
+
+## Gemini Web (실험 기능)
+
+Bridge는 로그인한 Gemini Web 계정을 Codex에 연결할 수도 있습니다.
+Gemini Web 계정과 사용 한도를 사용하며 API 키는 필요하지 않습니다.
+
+1. Bridge에서 **Gemini** 페이지를 열고 **Gemini Web 활성화**를 선택합니다.
+2. **Gemini 로그인 열기**를 선택해 Bridge 내장 Gemini 브라우저에서 로그인합니다. 브라우저는 열어 두어도 됩니다.
+3. **계속하여 모델 확인**을 선택해 계정에서 쓸 수 있는 모델과 사고 수준을 찾습니다.
+4. **Gemini 모델을 Codex에 추가**를 선택하고 Codex를 다시 시작한 뒤 `gemini-web/`으로 시작하는 모델을 선택합니다.
+
+Simple 모드는 추가 설정 없이 사용할 수 있습니다. Full MCP에는 고정된 공개 HTTPS
+주소와 Gemini 영어 UI에서 연결한 사용자 지정 앱이 필요합니다.
+
+현재 Gemini는 텍스트와 Codex 도구를 지원합니다. 첨부 파일, 미디어, Canvas,
+Deep Research, 노트북, 하위 에이전트는 아직 지원하지 않습니다.
+Gemini에서 오류가 나도 Bridge는 요청을 자동으로 다시 보내지 않습니다.
+
+Bridge는 로그인한 Gemini Web을 자동으로 조작하므로 화면이 바뀌면 작동하지 않을 수
+있습니다. 사용 전에 Google [서비스 약관](https://policies.google.com/terms)과 Gemini
+정책을 확인하세요. 이 연동은 해당 약관과 충돌할 수 있습니다.
+
+## 타사 라이선스
+
+의존성 패키지의 라이선스는 [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt)와
+`LICENSES/`에 포함되어 있습니다. 이 프로젝트는 [MIT 라이선스](LICENSE)를 따릅니다.

@@ -1,0 +1,21 @@
+WEBVTT
+
+00:00.000 --> 00:08.000
+Use ChatGPT Web models inside Codex.
+Actual Bridge interface; real Codex CLI trace, edited for length.
+
+00:08.000 --> 00:16.000
+Select the Bridge Medium model in Codex CLI.
+Ask it to fix a small calculation bug using Full MCP.
+
+00:16.000 --> 00:27.000
+The initial test run has one pass and two failures.
+The calculation adds price and quantity instead of multiplying them.
+
+00:27.000 --> 00:35.000
+The model changes one source line through a real file-edit tool call.
+The test assertions stay unchanged.
+
+00:35.000 --> 00:46.000
+Run the same tests again: three passes, zero failures.
+The actual command exits successfully.

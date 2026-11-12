@@ -1,0 +1,108 @@
+import { BRIDGE_PLATFORM_RESERVE_TOKENS } from "./input-tokens.js";
+import type {
+  BridgeContextBudget,
+  BridgeWebMode,
+  BridgeWebModelRoute,
+} from "./responses-server.js";
+
+export type BridgeAccountContextProfile = "compatibility" | "standard" | "pro";
+
+// Use the locally verified GPT-5.6 and GPT-6 Sol Pro-account retention budget.
+// The browser message envelope stays smaller; larger payloads must be staged.
+export const BRIDGE_SOL_FULL_CONTEXT_WINDOW = 260_000;
+export const BRIDGE_SOL_FULL_AUTO_COMPACT_LIMIT = 220_000;
+// Preserve the names exported before GPT-5.6 gained the same Full profile.
+export const BRIDGE_GPT6_FULL_CONTEXT_WINDOW = BRIDGE_SOL_FULL_CONTEXT_WINDOW;
+export const BRIDGE_GPT6_FULL_AUTO_COMPACT_LIMIT =
+  BRIDGE_SOL_FULL_AUTO_COMPACT_LIMIT;
+
+export function resolveBridgeRouteContextBudget(
+  route: BridgeWebModelRoute,
+  profile: BridgeAccountContextProfile = "compatibility",
+): BridgeContextBudget {
+  if (route.contextBudget) return route.contextBudget;
+  // A listed Pro route can recover while the installed account snapshot is old.
+  // Its own transport budget must not promote the account's other model routes.
+  const budget = resolveBridgeContextBudget(
+    route.mode,
+    route.mode === "pro" && profile === "standard" ? "pro" : profile,
+  );
+  if (
+    route.stagedContext &&
+    (route.nativeFamily === "6" || route.nativeFamily === "5.6") &&
+    profile === "pro" &&
+    ["medium", "high", "extra-high"].includes(route.mode)
+  )
+    return {
+      ...budget,
+      contextWindow: BRIDGE_SOL_FULL_CONTEXT_WINDOW,
+      hardInputTokenLimit: BRIDGE_SOL_FULL_CONTEXT_WINDOW,
+      autoCompactTokenLimit: BRIDGE_SOL_FULL_AUTO_COMPACT_LIMIT,
+      stagedContext: true,
+      profile: `${budget.profile}-gpt${route.nativeFamily}-full`,
+    };
+  if (
+    route.slug === "codexgpt-bridge/luna-native" &&
+    profile !== "compatibility"
+  )
+    return {
+      ...budget,
+      contextWindow: 1_050_000,
+      hardInputTokenLimit: 1_050_000,
+      autoCompactTokenLimit: 1_050_000,
+      profile: `${budget.profile}-luna-rolling`,
+    };
+  return budget;
+}
+
+/** Reference transport boundaries; these are not new measurements of this account. */
+export function resolveBridgeContextBudget(
+  mode: BridgeWebMode,
+  profile: BridgeAccountContextProfile = "compatibility",
+): BridgeContextBudget {
+  if (!["compatibility", "standard", "pro"].includes(profile))
+    throw new Error("Unknown Bridge account context profile.");
+  if (profile === "compatibility")
+    return {
+      contextWindow: 95_000,
+      autoCompactTokenLimit: 90_000,
+      hardInputTokenLimit: 95_000,
+      profile: "bridge-safe-v1",
+    };
+  const name = `bridge-chatgpt-${profile}-v1`;
+  if (mode === "luna" || mode === "think")
+    return {
+      contextWindow: 28_000,
+      autoCompactTokenLimit: 24_000,
+      hardInputTokenLimit: 28_000,
+      browserMessageTokenLimit: 28_000 - BRIDGE_PLATFORM_RESERVE_TOKENS - 1,
+      profile: name,
+    };
+  if (profile === "pro") {
+    const messageTokens = mode === "pro" ? 104_000 : 103_000;
+    const contextWindow = messageTokens + BRIDGE_PLATFORM_RESERVE_TOKENS + 1;
+    return {
+      contextWindow,
+      autoCompactTokenLimit: 95_000,
+      hardInputTokenLimit: contextWindow,
+      browserMessageTokenLimit: messageTokens,
+      browserComposerCharLimit:
+        mode === "instant" ? 545_000 : mode === "pro" ? 1_635_000 : 500_000,
+      profile: name,
+    };
+  }
+  if (mode === "pro")
+    throw new Error(
+      "ChatGPT Pro mode requires a Pro-capable account context profile.",
+    );
+  const contextWindow = mode === "instant" ? 41_000 : 90_000;
+  return {
+    contextWindow,
+    autoCompactTokenLimit: mode === "instant" ? 32_000 : 80_000,
+    hardInputTokenLimit: contextWindow,
+    browserMessageTokenLimit:
+      contextWindow - BRIDGE_PLATFORM_RESERVE_TOKENS - 1,
+    browserComposerCharLimit: mode === "instant" ? 211_256 : 1_048_572,
+    profile: name,
+  };
+}

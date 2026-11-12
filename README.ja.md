@@ -1,0 +1,108 @@
+# CodexGPT Bridge
+
+**ChatGPT の Web モデルを Codex で使用できます。**
+
+[English](README.md) · [繁體中文](README.zh-TW.md) · [简体中文](README.zh-CN.md) · [日本語](README.ja.md) · [한국어](README.ko.md)
+
+CodexGPT Bridge は Codex を、ログイン済みの ChatGPT Web セッションに接続します。
+モデルの選択、タスクごとの会話、画像、進捗表示、キャンセルに対応しています。
+プロジェクトファイル、ツール、承認は Codex が管理します。
+
+本プロジェクトは独立した第三者のプロジェクトであり、OpenAI とは提携していません。
+
+GPT プラグインと Full MCP の設定手順：[English](README.md#chatgpt-plugin-setup) · [繁體中文](README.zh-TW.md#chatgpt-外掛設定)。
+
+**v0.1.103:** Full MCP の公式 Tunnel クライアントを自動でダウンロードして検証できます。パスは空欄のままで利用できます。Tunnel の認証情報とプラグインの権限は引き続き必要です。
+
+## v0.1.104
+
+- **実験的な Gemini Web 対応：** ログイン後、アカウントで利用できるモデルと思考レベルを検出し、
+  Codex に追加できます。Simple と Full MCP は専用の Gemini タスクキューを使用します。
+  ログインや認証が必要な場合にウィンドウを表示し、手動でも開けます。
+- **ネイティブモデルの互換性：** Codex のネイティブモデルへの Responses WebSocket リクエストを
+  元のプロバイダーへ転送し、会話履歴と上流エラーを保持します。
+- **ChatGPT の安定性：** プロジェクトの読み込み判定と画像添付の識別を改善し、
+  一時チャットで指定の Full MCP アプリが使えない場合の対処方法を表示します。
+- **Full MCP と Windows：** ツール結果の配信確認まで処理中の状態を保持し、変更のないツール一覧を再利用します。
+  JSON 保存時の Windows の一時的なファイルロックも再試行します。
+
+Gemini の設定と現在の制限は、下の「Gemini Web（実験的機能）」を参照してください。
+
+## インストール
+
+このリポジトリの **[Releases](https://github.com/Fluxenith/codexgpt-bridge/releases/latest)** ページから、OS に対応するインストーラーをダウンロードしてください。
+Windows は `CodexGPT-Bridge-Setup-<バージョン>.exe`、macOS は DMG、
+Linux は AppImage または DEB を使用します。
+
+**macOS テスト版：** Intel／Apple Silicon 版は Apple の公証を受けていません。
+初回起動を試した後、「システム設定 → プライバシーとセキュリティ → このまま開く」
+で許可が必要になる場合があります。配布元を信頼できる場合のみ許可してください。
+[Apple の説明](https://support.apple.com/ja-jp/102445)を参照してください。
+
+Codex がインストールされており、使用するモデルにアクセスできる ChatGPT アカウントが必要です。
+利用できるモデルと使用量の上限はアカウントによって異なります。
+
+## はじめに
+
+1. Bridge を開き、ブラウザーとツールの接続方法を選択します。
+   初めて使う場合は Simple を選ぶと簡単です。Full MCP にはコネクターと tunnel の設定が必要です。
+2. 「ChatGPT ログインを開く」を選び、ログインします。Chrome でログインした場合は、
+   Bridge に戻って「ログイン完了、続行」を選択します。
+3. 「ChatGPT 接続をテスト」を選び、続いて「Web モデルをインストール」を選択します。
+4. Codex を再起動し、`CodexGPT Bridge — …` モデルを選択します。
+
+モデルを使用する間は Bridge を実行したままにしてください。
+メインウィンドウを閉じるとシステムトレイに残り、「終了」で停止します。
+「Web モデルを削除」は Bridge が管理していた設定を元に戻します。
+
+画面は英語、繁体字中国語、簡体字中国語、日本語、韓国語に対応しています。
+「言語」メニューから切り替えられます。
+
+## 更新とトラブルシューティング
+
+GitHub のリリースワークフローは、このリポジトリの更新 URL をインストーラーに組み込みます。
+ユーザーが更新 URL を入力する必要はありません。
+Bridge は起動時とバックグラウンドで新しいバージョンを確認します。
+オンライン更新にはアクセス可能な更新マニフェストとインストーラーが必要です。
+更新元がまだ利用できない場合は、**[Releases](https://github.com/Fluxenith/codexgpt-bridge/releases/latest)** から新しいバージョンをダウンロードしてください。
+
+接続に失敗した場合は、ChatGPT のログイン状態を確認してから Bridge の **Doctor** 診断を実行してください。
+問題を報告する際は、アプリのバージョン、OS、再現手順を記載し、
+アカウント情報、個人用のパス、会話内容、認証情報を削除してください。
+
+ログインデータと設定は、アプリのローカルユーザープロファイルに保存されます。
+
+## ソースコードから起動
+
+Node.js 22.20.0 以降と pnpm 11.19.0 を使用してください。
+
+```powershell
+pnpm install --frozen-lockfile
+pnpm desktop
+```
+
+## Gemini Web（実験的機能）
+
+Bridge はログイン済みの Gemini Web アカウントを Codex に接続することもできます。
+Gemini Web のアカウントと利用枠を使用し、API キーは不要です。
+
+1. Bridge で **Gemini** ページを開き、**Gemini Web を有効化** を選びます。
+2. **Gemini のログインを開く** を選び、Bridge 内蔵の Gemini ブラウザでログインします。ブラウザは開いたままで構いません。
+3. **続行してモデルを確認** を選び、アカウントで使えるモデルと思考レベルを確認します。
+4. **Gemini モデルを Codex に追加** を選び、Codex を再起動して `gemini-web/` で始まるモデルを選びます。
+
+Simple モードは追加設定なしで使えます。Full MCP には固定の公開 HTTPS アドレスと、
+Gemini の英語 UI で接続したカスタムアプリが必要です。
+
+現在 Gemini はテキストと Codex ツールに対応しています。添付ファイル、メディア、
+Canvas、Deep Research、ノートブック、サブエージェントには未対応です。
+Gemini でエラーが起きても、Bridge は要求を自動で再送しません。
+
+Bridge はログイン済みの Gemini Web を自動操作するため、画面の変更で動かなくなる
+ことがあります。利用前に Google の[利用規約](https://policies.google.com/terms)と
+Gemini のポリシーを確認してください。この連携はそれらに抵触する可能性があります。
+
+## サードパーティーのライセンス
+
+依存パッケージのライセンスは [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt)
+と `LICENSES/` に記載されています。本プロジェクトは [MIT ライセンス](LICENSE) の下で公開されています。
