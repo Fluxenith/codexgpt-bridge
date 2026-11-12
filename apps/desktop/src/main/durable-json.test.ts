@@ -12,7 +12,7 @@ import {
 
 it(
   "preserves atomic JSON replacement while a Windows reader temporarily denies delete sharing",
-  { skip: process.platform !== "win32", timeout: 10000 },
+  { skip: process.platform !== "win32", timeout: 30000 },
   async () => {
     const directory = await mkdtemp(join(tmpdir(), "bridge-durable-sharing-"));
     const file = join(directory, "state.json");
@@ -23,7 +23,7 @@ it(
         "-NoProfile",
         "-NonInteractive",
         "-Command",
-        '$lease=[System.IO.File]::Open($env:BRIDGE_JSON_LOCK_PATH,[System.IO.FileMode]::Open,[System.IO.FileAccess]::Read,[System.IO.FileShare]::ReadWrite); try { [Console]::WriteLine("LOCKED"); [Console]::Out.Flush(); Start-Sleep -Milliseconds 350 } finally { $lease.Dispose() }',
+        '$lease=[System.IO.File]::Open($env:BRIDGE_JSON_LOCK_PATH,[System.IO.FileMode]::Open,[System.IO.FileAccess]::Read,[System.IO.FileShare]::ReadWrite); try { [Console]::WriteLine("LOCKED"); [Console]::Out.Flush(); Start-Sleep -Milliseconds 1500 } finally { $lease.Dispose() }',
       ],
       {
         env: { ...process.env, BRIDGE_JSON_LOCK_PATH: file },

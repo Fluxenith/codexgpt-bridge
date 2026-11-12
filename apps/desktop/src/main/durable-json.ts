@@ -7,20 +7,22 @@ async function renameWithSharingRetry(
   source: string,
   destination: string,
 ): Promise<void> {
+  const deadline = Date.now() + 5_000;
   for (let attempt = 0; ; attempt++) {
     try {
       await rename(source, destination);
       return;
     } catch (error) {
+      const remainingMs = deadline - Date.now();
       if (
         process.platform !== "win32" ||
-        attempt >= 9 ||
+        remainingMs <= 0 ||
         !["EPERM", "EACCES", "EBUSY"].includes(
           (error as NodeJS.ErrnoException).code ?? "",
         )
       )
         throw error;
-      await delay(20 * (attempt + 1));
+      await delay(Math.min(20 * (attempt + 1), 200, remainingMs));
     }
   }
 }
