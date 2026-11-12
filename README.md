@@ -19,7 +19,7 @@ This is an independent third-party project, unaffiliated with OpenAI.
 automatically. Leave the client path blank; Tunnel credentials and plugin
 permissions are still required.
 
-## Latest source changes (unreleased)
+## v0.1.104
 
 - **Experimental Gemini Web:** sign in, discover account-available models and thinking levels,
   and add them to Codex. Simple and Full MCP use a separate Gemini task queue.
@@ -31,8 +31,7 @@ permissions are still required.
 - **Full MCP and Windows:** keep tool results pending until delivery is acknowledged,
   reuse unchanged tool inventories, and retry temporary Windows file locks during JSON saves.
 
-These changes are in the source branch; the download links above still point to the latest
-published release. See [Gemini Web setup and current limits](#gemini-web-experimental).
+See [Gemini Web setup and current limits](#gemini-web-experimental).
 
 ## See Bridge in action
 

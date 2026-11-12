@@ -14,7 +14,7 @@ GPT 플러그인 및 Full MCP 설정 안내: [English](README.md#chatgpt-plugin-
 
 **v0.1.103:** Full MCP의 공식 Tunnel 클라이언트를 자동으로 다운로드하고 검증합니다. 경로는 비워 두세요. Tunnel 자격 증명과 플러그인 권한은 계속 필요합니다.
 
-## 최신 소스 변경 사항 (미출시)
+## v0.1.104
 
 - **실험적 Gemini Web 지원:** 로그인한 계정에서 사용할 수 있는 모델과 사고 수준을 검색하여 Codex에 추가합니다.
   Simple과 Full MCP는 별도의 Gemini 작업 대기열을 사용합니다.
@@ -26,7 +26,6 @@ GPT 플러그인 및 Full MCP 설정 안내: [English](README.md#chatgpt-plugin-
 - **Full MCP 및 Windows:** 도구 결과의 전달이 확인될 때까지 대기 상태를 유지하고, 변경되지 않은 도구 목록을 재사용합니다.
   JSON 저장 중 Windows의 일시적인 파일 잠금도 재시도합니다.
 
-위 변경 사항은 소스 브랜치에 있으며, 다운로드 링크는 최신 공개 릴리스를 가리킵니다.
 Gemini 설정과 현재 제한 사항은 아래의 Gemini Web 실험 기능 안내를 참조하세요.
 
 ## 설치

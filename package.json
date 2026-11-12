@@ -1,7 +1,7 @@
 {
   "name": "codexgpt-bridge",
   "homepage": "https://github.com/Fluxenith/codexgpt-bridge",
-  "version": "0.1.103",
+  "version": "0.1.104",
   "private": true,
   "license": "MIT",
   "description": "Bring ChatGPT Web models into Codex.",
