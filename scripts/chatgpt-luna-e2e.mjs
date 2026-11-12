@@ -116,6 +116,7 @@ try {
           onStreamSnapshot: undefined,
           onContextCommit: undefined,
           onContextStaging: undefined,
+          isWaitingForNativeTools: undefined,
         },
       ),
   });
