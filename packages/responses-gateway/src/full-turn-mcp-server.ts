@@ -42,6 +42,10 @@ interface RpcInvocation {
   readonly result: Promise<unknown>;
   settledAt?: number;
 }
+interface ToolReceipt {
+  readonly turnToken: string;
+  readonly result: Promise<unknown>;
+}
 
 export interface FullTurnMcpAddress {
   readonly host: "127.0.0.1";
@@ -50,6 +54,20 @@ export interface FullTurnMcpAddress {
 }
 
 const TOOL_DEFINITIONS = [
+  {
+    name: "codex_wait_tool_result",
+    description:
+      "Wait for the exact pending operation_id returned by a Bridge tool. This retrieves its genuine result and never reruns the original command. Keep the original turn_token; if still pending, wait again with the same operation_id.",
+    inputSchema: {
+      type: "object",
+      additionalProperties: false,
+      required: ["turn_token", "operation_id"],
+      properties: {
+        turn_token: { type: "string", minLength: 40, maxLength: 256 },
+        operation_id: { type: "string", minLength: 20, maxLength: 100 },
+      },
+    },
+  },
   {
     name: "codex_manual_complete",
     description:
@@ -139,7 +157,7 @@ const TOOL_DEFINITIONS = [
     name: "codex_apply_patch",
     title: "Apply a native Codex patch",
     description:
-      "Invoke the apply_patch tool advertised by the active outer Codex turn, preserving its native file-change lifecycle.",
+      "Invoke the apply_patch tool advertised by the active outer Codex turn, preserving its native file-change lifecycle. Use the native patch format: *** Begin Patch, *** Update File: <path>, a bare @@ hunk header, context/removal/addition lines, then *** End Patch. Standard ---/+++ headers and unified line-number headers such as @@ -1,1 +1,1 @@ are not accepted. Paths must identify the intended Codex workspace file.",
     inputSchema: {
       type: "object",
       additionalProperties: false,
@@ -231,6 +249,9 @@ const manualCompletionTool: BridgeToolDefinition = {
 const MCP_SESSION_TTL_MS =
   BRIDGE_FULL_TURN_TIMEOUT_MS + BRIDGE_FULL_REPLAY_TTL_MS;
 const MAX_MCP_SESSIONS = 64;
+/** Ids this server issues (randomUUID); only these may be resumed. */
+const RESUMABLE_SESSION_ID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const MAX_RPC_REQUESTS_PER_SESSION = 1024;
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
@@ -392,6 +413,7 @@ export class FullTurnMcpServer {
   readonly #nativeRegistry: FullNativeRegistry;
   readonly #sessions = new Map<string, SessionState>();
   readonly #commandSessions = new Map<string, Set<number>>();
+  readonly #toolReceipts = new Map<string, ToolReceipt>();
   #server: Server | undefined;
 
   constructor(
@@ -447,6 +469,9 @@ export class FullTurnMcpServer {
         invocation.abort.abort(new Error("Full MCP server closed."));
     this.#sessions.clear();
     this.#commandSessions.clear();
+    for (const [id, receipt] of this.#toolReceipts)
+      this.#broker.releaseToolResult(receipt.turnToken, id);
+    this.#toolReceipts.clear();
     this.#nativeRegistry.close();
     if (!server) return;
     await new Promise<void>((resolvePromise, rejectPromise) => {
@@ -529,8 +554,10 @@ export class FullTurnMcpServer {
       };
       this.#sessions.set(session.id, session);
       const params = asRecord(rpc.params);
+      // Negotiate the implemented protocol instead of echoing arbitrary client
+      // versions, which would falsely advertise unsupported semantics.
       const protocolVersion =
-        typeof params?.protocolVersion === "string"
+        params?.protocolVersion === "2025-03-26"
           ? params.protocolVersion
           : "2025-03-26";
       json(
@@ -542,7 +569,7 @@ export class FullTurnMcpServer {
           result: {
             protocolVersion,
             capabilities: { tools: { listChanged: false } },
-            serverInfo: { name: "CodexGPT Bridge Full MCP", version: "1.0.0" },
+            serverInfo: { name: "CodexGPT Bridge Full MCP", version: "1.1.0" },
           },
         },
         { "Mcp-Session-Id": session.id },
@@ -551,6 +578,20 @@ export class FullTurnMcpServer {
     }
 
     const sessionId = request.headers["mcp-session-id"];
+    // A Bridge restart forgets sessions, but Gemini keeps using its old id and
+    // its 404 recovery then fails. Sessions hold no authority (every call
+    // carries its turn token), so resume a well-formed id instead.
+    if (
+      typeof sessionId === "string" &&
+      !this.#sessions.has(sessionId) &&
+      RESUMABLE_SESSION_ID.test(sessionId) &&
+      this.#sessions.size < MAX_MCP_SESSIONS
+    )
+      this.#sessions.set(sessionId, {
+        id: sessionId,
+        lastAccess: Date.now(),
+        requests: new Map(),
+      });
     if (typeof sessionId !== "string" || !this.#sessions.has(sessionId)) {
       json(response, 404, rpcError(rpc.id, -32001, "MCP session not found"));
       return;
@@ -644,9 +685,18 @@ export class FullTurnMcpServer {
         return;
       }
       const abort = new AbortController();
-      const result = Promise.resolve()
+      const rawResult = Promise.resolve()
         .then(() => this.#runTool(name, args, turnToken, abort.signal))
         .catch(fullTurnError);
+      const requestedWait = Number(request.headers["x-bridge-tool-wait-ms"]);
+      const boundedWait =
+        name !== "codex_wait_tool_result" &&
+        Number.isSafeInteger(requestedWait) &&
+        requestedWait >= 20 &&
+        requestedWait <= 20000;
+      const result = boundedWait
+        ? this.#boundedToolResult(turnToken, rawResult, requestedWait)
+        : rawResult;
       const owned: RpcInvocation = { fingerprint, turnToken, abort, result };
       session.requests.set(requestKey, owned);
       void result.then(() => {
@@ -656,8 +706,78 @@ export class FullTurnMcpServer {
     }
     // A disconnected HTTP peer loses only its observer. The operation remains
     // owned by this RPC request, and a retry with the same ID joins its result.
-    const result = await invocation.result;
-    json(response, 200, { jsonrpc: "2.0", id: rpc.id, result });
+    // Valid JSON permits leading whitespace. Flush headers and keep the native
+    // observer alive while Codex owns a slow command/approval. The RPC itself
+    // remains session-owned when an HTTP observer disconnects.
+    response.writeHead(200, {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store, no-transform",
+    });
+    response.flushHeaders();
+    const keepAlive = () => {
+      if (
+        !response.destroyed &&
+        !response.writableEnded &&
+        !response.writableNeedDrain
+      )
+        response.write(" \n");
+    };
+    keepAlive();
+    const heartbeat = setInterval(keepAlive, 15000);
+    heartbeat.unref();
+    const clearHeartbeat = () => clearInterval(heartbeat);
+    response.once("close", clearHeartbeat);
+    try {
+      const result = await invocation.result;
+      if (!response.destroyed && !response.writableEnded)
+        response.end(JSON.stringify({ jsonrpc: "2.0", id: rpc.id, result }));
+    } finally {
+      clearHeartbeat();
+      response.off("close", clearHeartbeat);
+    }
+  }
+
+  #pendingResult(operationId: string) {
+    const result = {
+      status: "pending",
+      operation_id: operationId,
+      next_tool: "codex_wait_tool_result",
+      instruction:
+        "The original operation is already running. Call codex_wait_tool_result with the SAME turn_token and this operation_id until its real result arrives. Do not rerun the original action or report completion from this receipt.",
+    };
+    return {
+      content: [{ type: "text", text: JSON.stringify(result) }],
+      structuredContent: result,
+    };
+  }
+  async #boundedToolResult(
+    turnToken: string,
+    result: Promise<unknown>,
+    waitMs: number,
+  ): Promise<unknown> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const pending = Symbol("pending");
+    try {
+      const value = await Promise.race([
+        result,
+        new Promise<typeof pending>((resolve) => {
+          timer = setTimeout(() => resolve(pending), waitMs);
+        }),
+      ]);
+      if (value !== pending) return value;
+      if (!this.#broker.isActive(turnToken))
+        return fullTurnError(
+          new Error("The original task is no longer active."),
+        );
+      if (this.#toolReceipts.size >= MAX_RPC_REQUESTS_PER_SESSION)
+        return result;
+      const id = "operation_" + randomUUID().replaceAll("-", "");
+      this.#broker.holdToolResult(turnToken, id);
+      this.#toolReceipts.set(id, { turnToken, result });
+      return this.#pendingResult(id);
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   async #runTool(
@@ -669,6 +789,39 @@ export class FullTurnMcpServer {
     signal.throwIfAborted();
     try {
       this.validateManualTurn?.(turnToken);
+      if (name === "codex_wait_tool_result") {
+        const receipt =
+          typeof args.operation_id === "string"
+            ? this.#toolReceipts.get(args.operation_id)
+            : undefined;
+        if (
+          !receipt ||
+          receipt.turnToken !== turnToken ||
+          !this.#broker.isActive(turnToken)
+        )
+          throw new Error(
+            "This pending operation does not belong to the active task.",
+          );
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const pending = Symbol("pending");
+        try {
+          const value = await Promise.race([
+            receipt.result,
+            new Promise<typeof pending>((resolve) => {
+              timer = setTimeout(() => resolve(pending), 15000);
+            }),
+          ]);
+          if (value === pending)
+            return this.#pendingResult(args.operation_id as string);
+          this.#broker.releaseToolResult(
+            turnToken,
+            args.operation_id as string,
+          );
+          return value;
+        } finally {
+          clearTimeout(timer);
+        }
+      }
       const staging = this.#broker.contextStagingInstruction(turnToken);
       if (staging) return staging;
       if (
@@ -693,7 +846,25 @@ export class FullTurnMcpServer {
           )
         )
           throw new Error("Manual completion is unavailable.");
-        this.onManualComplete(turnToken, completionArgs.text);
+        try {
+          this.onManualComplete(turnToken, completionArgs.text);
+        } catch (error) {
+          // Automatic turns finish with an ordinary reply; steer the model back.
+          if (
+            error instanceof Error &&
+            error.message.startsWith("No sent manual turn")
+          )
+            return {
+              isError: true,
+              content: [
+                {
+                  type: "text",
+                  text: "This is not a manual handoff, so nothing was submitted. Do not call codex_manual_complete again. Write your final answer as your normal reply.",
+                },
+              ],
+            };
+          throw error;
+        }
         return {
           content: [{ type: "text", text: "Manual final answer accepted." }],
         };
@@ -953,6 +1124,9 @@ export class FullTurnMcpServer {
 
   #pruneSessions(): void {
     this.#nativeRegistry.prune();
+    for (const [id, receipt] of this.#toolReceipts)
+      if (!this.#broker.isActive(receipt.turnToken))
+        this.#toolReceipts.delete(id);
     const cutoff = Date.now() - MCP_SESSION_TTL_MS;
     for (const [sessionId, session] of this.#sessions) {
       for (const [key, invocation] of session.requests) {

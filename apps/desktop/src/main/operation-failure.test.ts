@@ -23,6 +23,7 @@ describe("operation failure recovery", () => {
       "model-selection-disabled",
       "model-selection-mismatch",
       "full-mcp-connector-unavailable",
+      "full-mcp-temporary-connector-unavailable",
       "native-tool-selection-active",
     ] as const) {
       assert.equal(
@@ -91,6 +92,7 @@ describe("operation failure recovery", () => {
       "model-selection-disabled",
       "model-selection-mismatch",
       "full-mcp-connector-unavailable",
+      "full-mcp-temporary-connector-unavailable",
       "native-tool-selection-active",
       "preparation-failed",
       "web-tool-failed",
@@ -124,9 +126,18 @@ describe("operation failure recovery", () => {
     assert.deepEqual(operationRecovery("full-mcp-connector-unavailable"), {
       title: "Full MCP app unavailable",
       instruction:
-        "Full MCP currently requires ChatGPT Business, Enterprise, or Edu and an enabled custom app with the exact configured name. Create or enable that app, or choose Simple for a new turn.",
+        "Check that ChatGPT offers an enabled app with the exact configured name in this conversation, or choose Simple for a new turn.",
       action: "open-task",
       automatic: false,
     });
+    const temporary = operationRecovery(
+      "full-mcp-temporary-connector-unavailable",
+    );
+    assert.equal(temporary.automatic, false);
+    assert.match(temporary.instruction, /saved in ChatGPT history/);
+    assert.match(
+      temporary.instruction,
+      /keep Temporary Chat and choose Simple/,
+    );
   });
 });

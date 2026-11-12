@@ -32,8 +32,10 @@ import {
   LunaCheckpointStore,
   FullTurnMcpServer,
   ResponsesGateway,
+  WebProviderRegistry,
   buildStartupModelsPayload,
   buildWebOnlyModelsPayload,
+  providerCatalogRoutes,
   type BridgeAccountContextProfile,
   type BridgeWebMode,
   type BridgeNativeModelFamily,
@@ -43,6 +45,11 @@ import type { DesktopSettings, WebProviderStatus } from "./preload.cjs";
 import { retireWorkspaceService } from "./retired-workspace-service.js";
 import { ChatGptBrowserController } from "./chatgpt-browser.js";
 import { ChromeChatGptHost } from "./chrome-chatgpt-window.js";
+import { EmbeddedGeminiHost } from "./embedded-gemini-host.js";
+import { GeminiBrowserProvider } from "./gemini-browser.js";
+import { GeminiBrowserRelay } from "./gemini-browser-relay.js";
+import { GeminiMcpService } from "./gemini-mcp-service.js";
+import type { GeminiSettings, GeminiStatus } from "./gemini-types.js";
 import { ChatGptVerificationRequiredError } from "./chatgpt-page-access.js";
 import { MacOsPasskeyLogin } from "./macos-passkey-login.js";
 import type { BrowserSmokeResult } from "./browser-smoke.js";
@@ -110,7 +117,13 @@ if (process.platform === "win32") {
 // Some Windows display drivers lose the Chromium compositor while the DOM and
 // IPC remain healthy, leaving an empty main window. Configure software rendering
 // before app readiness so reopening the window does not reuse that compositor.
-if (process.platform === "win32") app.disableHardwareAcceleration();
+if (process.platform === "win32") {
+  app.disableHardwareAcceleration();
+  // Gemini completes its footer using rendering callbacks. Keep those running
+  // when another application covers the embedded provider window.
+  app.commandLine.appendSwitch("disable-backgrounding-occluded-windows");
+  app.commandLine.appendSwitch("disable-renderer-backgrounding");
+}
 if (developmentProfile) {
   app.setPath("userData", `${app.getPath("userData")}-dev`);
   app.setName("CodexGPT Bridge DEV");
@@ -259,6 +272,34 @@ const chromeChatGptHost = new ChromeChatGptHost(
   undefined,
   true,
 );
+const geminiBrowser = new GeminiBrowserProvider(
+  join(app.getPath("userData"), "providers", "gemini"),
+  new EmbeddedGeminiHost(),
+  (input) => resolveCodexProjectName(codexHome(), input),
+);
+const geminiRelayDirectory = e2eUserDataDirectory
+  ? process.env.CODEXGPT_BRIDGE_E2E_GEMINI_RELAY
+  : undefined;
+if (geminiRelayDirectory && !isAbsolute(geminiRelayDirectory))
+  throw new Error("Gemini acceptance relay directory must be absolute.");
+const geminiRelay = geminiRelayDirectory
+  ? new GeminiBrowserRelay(geminiRelayDirectory)
+  : undefined;
+const webProviders = new WebProviderRegistry([geminiRelay ?? geminiBrowser]);
+const geminiMcp = new GeminiMcpService(
+  join(homedir(), ".codexgpt-bridge", "gemini-mcp"),
+);
+async function geminiStatus(): Promise<GeminiStatus> {
+  if (geminiRelay)
+    return {
+      settings: await geminiBrowser.settings(),
+      login: { phase: "idle", verified: true },
+      capabilities: await geminiRelay.capabilities(),
+      busy: geminiRelay.busy,
+      mcp: geminiMcp.status(),
+    };
+  return { ...(await geminiBrowser.status()), mcp: geminiMcp.status() };
+}
 function createChatGptBrowser(): ChatGptBrowserController {
   return new ChatGptBrowserController(
     process.env.CODEXGPT_BRIDGE_E2E_CHATGPT_URL?.trim() || undefined,
@@ -861,6 +902,7 @@ async function probeSupportedBridgeModes(): Promise<readonly BridgeWebMode[]> {
 
 async function writeManagedModelCatalog(
   availableModes: readonly BridgeWebMode[],
+  onlyGemini = false,
 ): Promise<{
   readonly path: string;
   readonly hash: string;
@@ -870,8 +912,13 @@ async function writeManagedModelCatalog(
     existingCatalog,
     availableModes,
     await configuredContextProfile(availableModes),
-    await probeNativeModelFamilies(),
+    // Adding Gemini must not erase ChatGPT routes; skip them only when the
+    // ChatGPT account cannot be probed right now.
+    onlyGemini
+      ? await probeNativeModelFamilies().catch(() => [])
+      : await probeNativeModelFamilies(),
     (await loadSettings()).webToolMode === "full" ? true : "simple",
+    await webProviders.routes(),
   );
   const text = `${JSON.stringify(catalog, null, 2)}\n`;
   const path = codexManagedModelCatalogPath();
@@ -1093,6 +1140,43 @@ async function invalidateCodexModelCache(): Promise<void> {
   await rm(codexModelsCachePath(), { force: true }).catch(() => undefined);
 }
 
+/** A Gemini-only install used to publish no ChatGPT modes, and later
+ * refreshes read modes back from that catalog. Probe ChatGPT once so those
+ * catalogs regain their ChatGPT routes. */
+async function recoverEmptyChatGptCatalog(): Promise<void> {
+  const settings = await loadSettings();
+  if (settings.interactionMode === "manual") return;
+  if ((await webOnlyIntegration.status()).managed) return;
+  const journal = await loadCodexProviderIntegrationJournal();
+  if (!hasManagedProviderCatalog(journal)) return;
+  const current = await readTextIfPresent(journal.catalogPath);
+  if (!current.exists) return;
+  const payload = parseModelsCatalog(
+    current.text,
+    "managed Codex model catalog",
+  );
+  if (bridgeWebModesInCatalog(payload).length > 0) return;
+  const report = join(app.getPath("userData"), "catalog-recovery.json");
+  try {
+    const modes = await probeSupportedBridgeModes();
+    const families = await probeNativeModelFamilies().catch(() => undefined);
+    await mutateProvider(() => refreshOwnedCodexModelCatalog(families, modes));
+    await atomicWriteText(
+      report,
+      JSON.stringify({ at: new Date().toISOString(), modes, families }),
+    );
+  } catch (error) {
+    await atomicWriteText(
+      report,
+      JSON.stringify({
+        at: new Date().toISOString(),
+        error: error instanceof Error ? error.message : String(error),
+      }),
+    ).catch(() => undefined);
+    throw error;
+  }
+}
+
 async function refreshOwnedCodexModelCatalog(
   nativeFamilies?: readonly BridgeNativeModelFamily[],
   modes?: readonly BridgeWebMode[],
@@ -1121,6 +1205,7 @@ async function refreshOwnedCodexModelCatalog(
     ),
     nativeFamilies,
     (await loadSettings()).webToolMode === "full" ? true : "simple",
+    await webProviders.routes(),
   );
   const text = `${JSON.stringify(catalog, null, 2)}\n`;
   if (text === current.text) return;
@@ -1144,6 +1229,7 @@ async function refreshOwnedWebOnlyModelCatalog(
       await configuredContextProfile(modes),
       nativeFamilies,
       (await loadSettings()).webToolMode === "full" ? true : "simple",
+      await webProviders.routes(),
     );
   });
   if (changed) await invalidateCodexModelCache();
@@ -1234,7 +1320,10 @@ async function codexProviderInstalledStatus(): Promise<{
   };
 }
 
-async function installCodexWebProvider(repair = false): Promise<void> {
+async function installCodexWebProvider(
+  repair = false,
+  onlyGemini = false,
+): Promise<void> {
   if ((await webOnlyIntegration.status()).managed)
     throw new Error(
       "Restore the previous mode before changing the regular provider.",
@@ -1348,7 +1437,12 @@ async function installCodexWebProvider(repair = false): Promise<void> {
     (repairPlan || repairingMissingHook || reinstallingDetachedProvider) &&
     hasManagedProviderCatalog(previousJournal)
       ? { path: previousJournal.catalogPath, hash: previousJournal.catalogHash }
-      : await writeManagedModelCatalog(await probeSupportedBridgeModes());
+      : await writeManagedModelCatalog(
+          onlyGemini
+            ? await probeSupportedBridgeModes().catch(() => [])
+            : await probeSupportedBridgeModes(),
+          onlyGemini,
+        );
   const lineEnding = lineEndingFor(providerConfigText);
   const nextBlock = managedProviderBlock(baseUrl, catalog.path, lineEnding);
   let nextText: string;
@@ -1526,22 +1620,47 @@ function fullMcpSettings(settings: DesktopSettings): FullMcpTunnelSettings {
 }
 
 async function startFullMcp(settings: DesktopSettings): Promise<void> {
-  if (settings.webToolMode !== "full" || fullMcpAddress) return;
-  const tunnelSettings = fullMcpSettings(settings);
-  tunnelManager.validate(tunnelSettings);
-  const address = await fullTurnMcpServer.start(desktopFullMcpPort());
-  try {
-    const status = await tunnelManager.connect(tunnelSettings, address.url);
-    fullMcpAddress = address;
-    fullMcpTunnelStatus = status;
-  } catch (error) {
-    await fullTurnMcpServer.close().catch(() => undefined);
-    throw error;
+  const gemini = await geminiBrowser.settings();
+  const geminiFull = gemini.enabled && !!gemini.publicBaseUrl;
+  const chatGptFull = settings.webToolMode === "full";
+  const chatGptConfigured =
+    !!settings.fullMcpTunnelId && !!settings.fullMcpRuntimeKeyFile;
+  if (chatGptFull && !chatGptConfigured && !gemini.enabled)
+    fullMcpSettings(settings);
+  if (!geminiFull && !(chatGptFull && chatGptConfigured)) return;
+  const address =
+    fullMcpAddress ?? (await fullTurnMcpServer.start(desktopFullMcpPort()));
+  fullMcpAddress = address;
+  if (chatGptFull && chatGptConfigured && !fullMcpTunnelStatus?.ready) {
+    try {
+      const tunnelSettings = fullMcpSettings(settings);
+      tunnelManager.validate(tunnelSettings);
+      fullMcpTunnelStatus = await tunnelManager.connect(
+        tunnelSettings,
+        address.url,
+      );
+    } catch (error) {
+      fullMcpTunnelStatus = {
+        configured: true,
+        running: false,
+        ready: false,
+        detail:
+          error instanceof Error ? error.message : "ChatGPT tunnel failed.",
+      };
+      if (!gemini.enabled) {
+        await fullTurnMcpServer.close().catch(() => undefined);
+        fullMcpAddress = undefined;
+        throw error;
+      }
+    }
   }
+  if (geminiFull)
+    await geminiMcp.start(gemini, address.url).catch(() => undefined);
 }
 
 async function stopFullMcp(): Promise<void> {
   const errors: unknown[] = [];
+  await geminiMcp.close().catch((error) => errors.push(error));
   await tunnelManager.stop().catch((error) => errors.push(error));
   await fullTurnMcpServer.close().catch((error) => errors.push(error));
   fullMcpAddress = undefined;
@@ -1567,12 +1686,13 @@ function manualWebModes(settings: DesktopSettings): readonly BridgeWebMode[] {
 async function startResponsesGateway(): Promise<void> {
   if (responsesGateway !== undefined) return;
   const settings = await loadSettings();
-  if (settings.webToolMode === "full") await startFullMcp(settings);
+  await startFullMcp(settings);
   const providerCapability = {
     token: randomBytes(32).toString("hex"),
     instanceId: randomBytes(16).toString("hex"),
   };
   const gateway = new ResponsesGateway({
+    providers: webProviders,
     lunaCheckpoints: new LunaCheckpointStore(
       join(app.getPath("userData"), "luna-checkpoints.json"),
     ),
@@ -1650,15 +1770,20 @@ async function startResponsesGateway(): Promise<void> {
         ...(projectName ? { projectName } : {}),
       });
     },
-    ...(settings.webToolMode === "full"
-      ? {
-          fullMcp: {
-            broker: fullTurnBroker,
-            enabled: () => true,
-            connectorName: () => settings.fullMcpConnectorName,
-          },
-        }
-      : {}),
+    fullMcp: {
+      broker: fullTurnBroker,
+      enabled: (provider) =>
+        provider === "gemini"
+          ? geminiMcp.status().running
+          : settings.webToolMode === "full" &&
+            fullMcpTunnelStatus?.ready === true,
+      required: (provider) =>
+        provider === "chatgpt" && settings.webToolMode === "full",
+      connectorName: async (provider) =>
+        provider === "gemini"
+          ? (await geminiBrowser.settings()).connectorName
+          : settings.fullMcpConnectorName,
+    },
   });
   try {
     responsesAddress = await gateway.start();
@@ -1723,7 +1848,17 @@ async function webProviderStatus(): Promise<WebProviderStatus> {
           availableModes.includes(route.mode),
         )
   ).map((route) => route.slug);
-  if (settings.webToolMode === "full" && fullMcpAddress) {
+  modelIds.push(
+    ...providerCatalogRoutes(await webProviders.routes()).map(
+      (route) => route.slug,
+    ),
+  );
+  if (
+    settings.webToolMode === "full" &&
+    fullMcpAddress &&
+    settings.fullMcpTunnelId &&
+    settings.fullMcpRuntimeKeyFile
+  ) {
     fullMcpTunnelStatus = await tunnelManager.status().catch((error) => ({
       configured: true,
       running: false,
@@ -1732,6 +1867,7 @@ async function webProviderStatus(): Promise<WebProviderStatus> {
     }));
   }
   return {
+    gemini: await geminiStatus(),
     browserSmoke: {
       status: browserSmokeRunning
         ? "running"
@@ -1812,6 +1948,10 @@ async function webProviderStatus(): Promise<WebProviderStatus> {
 }
 
 async function launchVerifiedUpdate(): Promise<void> {
+  if ((await geminiBrowser.status()).busy)
+    throw new Error(
+      "Finish or cancel Gemini tasks before installing an update.",
+    );
   if (manualTurns.tasks().length)
     throw new Error(
       "Finish or cancel manual turns before installing an update.",
@@ -1990,6 +2130,91 @@ function registerDesktopCommand(
 }
 
 function registerIpc(): void {
+  registerDesktopCommand("app:quit", () => {
+    setTimeout(() => app.quit(), 100).unref();
+    return { quitting: true };
+  });
+  registerDesktopCommand("gemini:diagnostics", () =>
+    geminiBrowser.diagnostics(),
+  );
+  registerDesktopCommand("gemini:probe-temporary-full", () =>
+    geminiBrowser.probeTemporaryFullMcp(),
+  );
+  registerDesktopCommand(
+    "gemini:verify-full-route",
+    async (_event, simpleSlug: unknown) => {
+      if (typeof simpleSlug !== "string" || !geminiMcp.status().running)
+        throw new Error(
+          "Start the Gemini MCP ingress and choose an observed Simple route first.",
+        );
+      await geminiBrowser.verifyFullRoute(simpleSlug);
+      return geminiStatus();
+    },
+  );
+  registerDesktopCommand(
+    "gemini:settings",
+    (_event, value: Partial<GeminiSettings>) =>
+      mutateProvider(async () => {
+        const before = await geminiBrowser.settings();
+        const settings = await geminiBrowser.configure(value);
+        if (
+          !settings.enabled ||
+          settings.publicBaseUrl !== before.publicBaseUrl
+        )
+          await geminiMcp.close();
+        if (settings.enabled) {
+          if (responsesGateway) await startFullMcp(await loadSettings());
+          else await startResponsesGateway();
+        }
+        await refreshOwnedCodexModelCatalog();
+        await refreshOwnedWebOnlyModelCatalog();
+        return geminiStatus();
+      }),
+  );
+  registerDesktopCommand("gemini:login", async () => {
+    await geminiBrowser.login();
+    return geminiStatus();
+  });
+  registerDesktopCommand("gemini:login-continue", async () => {
+    await geminiBrowser.finishLogin();
+    await mutateProvider(async () => {
+      await refreshOwnedCodexModelCatalog();
+      await refreshOwnedWebOnlyModelCatalog();
+    });
+    return geminiStatus();
+  });
+  registerDesktopCommand("gemini:discover", async () => {
+    await geminiBrowser.discover();
+    await mutateProvider(async () => {
+      await refreshOwnedCodexModelCatalog();
+      await refreshOwnedWebOnlyModelCatalog();
+    });
+    return geminiStatus();
+  });
+  registerDesktopCommand("gemini:install", () =>
+    mutateProvider(async () => {
+      if (!(await webProviders.routes()).length)
+        throw new Error(
+          "Enable Gemini and verify its account capabilities before installing models.",
+        );
+      if (!(await codexProviderInstalledStatus()).installed)
+        await installCodexWebProvider(false, true);
+      await refreshOwnedCodexModelCatalog();
+      await refreshOwnedWebOnlyModelCatalog();
+      return webProviderStatus();
+    }),
+  );
+  registerDesktopCommand("gemini:copy-pairing", async () => {
+    clipboard.writeText(await geminiMcp.pairingCode());
+  });
+  registerDesktopCommand("gemini:cancel", async () => {
+    geminiBrowser.cancel();
+    return geminiStatus();
+  });
+  registerDesktopCommand("gemini:show-window", async () => {
+    await geminiBrowser.showWindow();
+    return geminiStatus();
+  });
   registerDesktopCommand("provider:stop", () => {
     setTimeout(() => void stopResponsesGateway(), 0).unref?.();
     return { stopping: true };
@@ -2264,6 +2489,10 @@ function registerIpc(): void {
   registerDesktopCommand(
     "settings:set-full-mcp",
     async (_event, value: unknown) => {
+      if ((await geminiBrowser.status()).busy)
+        throw new Error(
+          "Finish or cancel the active Gemini task before restarting shared MCP services.",
+        );
       if (!value || typeof value !== "object" || Array.isArray(value)) {
         throw new Error("Invalid Full MCP settings.");
       }
@@ -2736,6 +2965,18 @@ if (ownsSingleInstance) {
       await startResponsesGateway().catch(() => undefined);
     }
     await createWindow();
+    // A Gemini probe must not hold up the desktop or the ChatGPT provider.
+    // Refresh the owned catalog again once account verification restores routes.
+    void (geminiRelay ? Promise.resolve() : geminiBrowser.restoreLogin())
+      .then(() =>
+        mutateProvider(async () => {
+          await refreshOwnedCodexModelCatalog();
+          await refreshOwnedWebOnlyModelCatalog();
+        }),
+      )
+      .catch(() => undefined)
+      .then(() => recoverEmptyChatGptCatalog())
+      .catch(() => undefined);
     const startupNativeVerification =
       e2eUserDataDirectory === undefined &&
       startupSessionSupplied &&
@@ -2870,6 +3111,7 @@ app.on("before-quit", (event) => {
       await passkeyLogin.close();
       await chatGptBrowser.close();
       await chromeChatGptHost.close();
+      await webProviders.close();
       await stopResponsesGateway();
       systemTray?.tray.destroy();
       app.exit(0);

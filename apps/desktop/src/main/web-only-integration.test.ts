@@ -14,6 +14,21 @@ const baseUrl = "http://127.0.0.1:7767/web/v1";
 const plan = (text: string) =>
   planWebOnlyConfig(text, baseUrl, "C:/fixture/models.json", token);
 
+it("restores the original Codex configuration after selecting an account-discovered Gemini route", () => {
+  const original = 'model = "native"\nmodel_provider = "native-provider"\n';
+  const installed = plan(original);
+  const selected = installed.installed
+    .replace(
+      'model = "codexgpt-bridge/high"',
+      'model = "gemini-web/observed-id/low/full"',
+    )
+    .replace(
+      'model_reasoning_effort = "high"',
+      'model_reasoning_effort = "low"',
+    );
+  assert.equal(restoreWebOnlyConfig(selected, installed), original);
+});
+
 it("refreshes owned model budgets without changing config, credentials or restore ownership", async () => {
   const directory = await mkdtemp(join(tmpdir(), "bridge-web-only-budget-"));
   try {

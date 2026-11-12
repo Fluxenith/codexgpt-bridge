@@ -12,6 +12,16 @@ import {
 export type { BridgeProgressStage } from "./bridge-progress.js";
 import { canonicalJson, responsesOperationId } from "./operation-identity.js";
 import type { BridgeContext } from "./prompt.js";
+import type {
+  WebProviderId,
+  WebProviderRegistry,
+  WebProviderRoute,
+} from "./web-provider.js";
+import {
+  isKnownProviderModel,
+  providerCatalogRoutes,
+  resolveProviderRoute,
+} from "./provider-route-groups.js";
 import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import {
   createServer,
@@ -93,6 +103,10 @@ export type BridgeWebMode =
   "instant" | "medium" | "high" | "extra-high" | "pro" | "luna" | "think";
 
 export interface BridgeWebModelRoute {
+  readonly toolMode?: "simple" | "full";
+  readonly inputModalities?: readonly ("text" | "image")[];
+  readonly provider?: WebProviderId;
+  readonly contextBudget?: BridgeContextBudget;
   readonly slug: string;
   readonly displayName: string;
   readonly description: string;
@@ -279,6 +293,8 @@ const STREAM_HEARTBEAT_MS = 5_000;
 const WEBSOCKET_HEARTBEAT_MS = 10_000;
 
 export interface RunWebTurnInput {
+  readonly isWaitingForNativeTools?: () => boolean;
+  readonly providerRoute?: WebProviderRoute;
   readonly turnToken?: string;
   readonly requiredSubagentResults?: number;
   readonly silenceTimeoutSeconds?: number;
@@ -323,6 +339,8 @@ export interface RunWebTurnInput {
 }
 
 export interface ResponsesGatewayOptions {
+  /** Additional account-discovered Web providers; legacy ChatGPT routes stay compatible. */
+  readonly providers?: WebProviderRegistry;
   readonly lunaCheckpoints?: LunaCheckpointStore;
   readonly admin?: {
     readonly token: string;
@@ -367,8 +385,11 @@ export interface ResponsesGatewayOptions {
   readonly applicationHeartbeatMs?: number;
   readonly fullMcp?: {
     readonly broker: FullTurnBroker;
-    readonly enabled: () => boolean | Promise<boolean>;
-    readonly connectorName: () => string | Promise<string>;
+    readonly enabled: (provider?: WebProviderId) => boolean | Promise<boolean>;
+    readonly required?: (provider: WebProviderId) => boolean | Promise<boolean>;
+    readonly connectorName: (
+      provider?: WebProviderId,
+    ) => string | Promise<string>;
   };
 }
 
@@ -1302,9 +1323,21 @@ async function runBridgeWebTurn(
   onCommentary?: (commentary: BridgePublicCommentary) => void,
 ): Promise<BridgeWebTurnResult> {
   const canonicalSource = compiled;
+  // ChatGPT's retained-context receipts cannot waive another provider's limits.
+  const receiptAwareContextSync =
+    route.provider === undefined && options.receiptAwareContextSync === true;
   const rollingLuna = route.slug === "codexgpt-bridge/luna-native";
-  const fullEnabled =
-    !!fullCoordinator && (await options.fullMcp?.enabled()) === true;
+  const fullAvailable =
+    !!fullCoordinator &&
+    (await options.fullMcp?.enabled(route.provider ?? "chatgpt")) === true;
+  if (
+    (route.toolMode === "full" ||
+      (route.toolMode !== "simple" &&
+        (await options.fullMcp?.required?.(route.provider ?? "chatgpt")))) &&
+    !fullAvailable
+  )
+    throw new FullMcpUnavailableError();
+  const fullEnabled = route.toolMode === "simple" ? false : fullAvailable;
   if (rollingLuna) {
     if (!fullEnabled) throw new FullMcpUnavailableError();
     if (compiled.compaction)
@@ -1316,7 +1349,7 @@ async function runBridgeWebTurn(
   const prepared = prepareBridgeWebTurn(compiled);
   const connectorName =
     fullEnabled && !compiled.compaction
-      ? await options.fullMcp!.connectorName()
+      ? await options.fullMcp!.connectorName(route.provider ?? "chatgpt")
       : undefined;
   // Full delivers schemas through its MCP inventory, not the Simple text catalog.
   // Use the same native contract for accounting and the initial context gate.
@@ -1385,7 +1418,7 @@ async function runBridgeWebTurn(
               : {}),
           };
     const problem = bridgeExecutionLimitProblem(execution);
-    if (!options.receiptAwareContextSync && problem !== undefined) {
+    if (!receiptAwareContextSync && problem !== undefined) {
       return Promise.reject(
         new BridgeContextLimitError(
           route,
@@ -1399,12 +1432,20 @@ async function runBridgeWebTurn(
     const lease = lifecycle.acquireBrowserTurn();
     browserSubmissions += 1;
     return Promise.resolve()
-      .then(() => options.runWebTurn({ ...input, execution }))
+      .then(() =>
+        route.provider && options.providers
+          ? options.providers.runTurn({
+              ...input,
+              execution,
+              providerRoute: route as WebProviderRoute,
+            })
+          : options.runWebTurn({ ...input, execution }),
+      )
       .finally(() => lease.release());
   };
   const tokenBreakdown = compiledInputTokenBreakdown(compiled, usagePrepared);
   if (
-    !options.receiptAwareContextSync &&
+    !receiptAwareContextSync &&
     !compiled.compaction &&
     tokenBreakdown.total > budget.hardInputTokenLimit
   ) {
@@ -1413,7 +1454,9 @@ async function runBridgeWebTurn(
   const operationId = responsesOperationId(route.slug, compiled);
   const modelFamily = route.nativeFamily
     ? `bridge-native:${route.nativeFamily}`
-    : await options.modelFamily?.();
+    : route.provider
+      ? undefined
+      : await options.modelFamily?.();
   const reportProgress = (stage: BridgeProgressStage): void => {
     if (!signal.aborted && !compiled.compaction) onProgress?.(stage);
   };
@@ -1443,7 +1486,7 @@ async function runBridgeWebTurn(
       : budget.browserMessageTokenLimit + tokenBreakdown.platformReserve;
   if (
     compiled.compaction &&
-    options.receiptAwareContextSync &&
+    receiptAwareContextSync &&
     (tokenBreakdown.total >
       Math.min(budget.hardInputTokenLimit, checkpointMessageTarget) ||
       (budget.browserComposerCharLimit !== undefined &&
@@ -1898,6 +1941,37 @@ function providerFailure(error: unknown): {
   retry_after_seconds?: number;
 } {
   if (
+    error instanceof Error &&
+    "code" in error &&
+    typeof error.code === "string"
+  ) {
+    const code = error.code;
+    if (
+      /^gemini_(?:generation_timeout|generation_failed|tool_timeout|login_required|quota_exhausted|verification_required|page_changed|submission_uncertain)$/u.test(
+        code,
+      )
+    )
+      return {
+        type:
+          code === "gemini_quota_exhausted"
+            ? "rate_limit_error"
+            : "server_error",
+        code,
+        message: error.message,
+      };
+    if (
+      error.name === "WebProviderError" &&
+      /^(?:provider_unavailable|model_unavailable|selection_mismatch|account_changed)$/u.test(
+        code,
+      )
+    )
+      return {
+        type: "invalid_request_error",
+        code: `bridge_web_${code}`,
+        message: error.message,
+      };
+  }
+  if (
     error instanceof FullContextTransferError ||
     error instanceof LunaCheckpointError
   )
@@ -2003,6 +2077,36 @@ function providerFailure(error: unknown): {
   };
 }
 
+function providerFailureStatus(
+  failure: ReturnType<typeof providerFailure>,
+): number {
+  if (failure.code === "gemini_generation_failed") return 502;
+  if (
+    failure.type === "rate_limit_error" ||
+    failure.retry_after_seconds !== undefined
+  )
+    return 429;
+  if (
+    [
+      "gemini_login_required",
+      "gemini_verification_required",
+      "bridge_web_provider_unavailable",
+    ].includes(failure.code)
+  )
+    return 503;
+  if (
+    ["gemini_generation_timeout", "gemini_tool_timeout"].includes(failure.code)
+  )
+    return 504;
+  if (
+    ["gemini_submission_uncertain", "bridge_web_account_changed"].includes(
+      failure.code,
+    )
+  )
+    return 409;
+  return failure.type === "invalid_request_error" ? 400 : 500;
+}
+
 function failResponseStream(
   write: ResponseEventWriter,
   state: ResponseStreamState,
@@ -2103,7 +2207,9 @@ function bridgeWebModelRoute(model: unknown): BridgeWebModelRoute | undefined {
 
 function isBridgeWebModel(model: unknown): model is string {
   return (
-    typeof model === "string" && model.startsWith(CODEXGPT_BRIDGE_MODEL_PREFIX)
+    typeof model === "string" &&
+    (model.startsWith(CODEXGPT_BRIDGE_MODEL_PREFIX) ||
+      model.startsWith("gemini-web/"))
   );
 }
 
@@ -2119,7 +2225,7 @@ function bridgeModel(
     slug: route.slug,
     display_name: route.displayName,
     description: route.description,
-    input_modalities: ["text", "image"],
+    input_modalities: route.inputModalities ?? ["text", "image"],
     default_reasoning_level: route.effort,
     supported_reasoning_levels: (route.supportedEfforts ?? [route.effort]).map(
       (effort) => ({ effort, description: `${route.displayName} · ${effort}` }),
@@ -2176,6 +2282,7 @@ export function buildStartupModelsPayload(
   accountProfile: BridgeAccountContextProfile = "compatibility",
   nativeFamilies?: readonly BridgeNativeModelFamily[],
   nativeRoutesEnabled: boolean | "simple" = true,
+  providerRoutes: readonly WebProviderRoute[] = [],
 ): unknown {
   const record = asRecord(existingPayload);
   if (record === undefined || !Array.isArray(record.models)) {
@@ -2191,6 +2298,7 @@ export function buildStartupModelsPayload(
       accountProfile,
       nativeFamilies,
       nativeRoutesEnabled,
+      providerRoutes,
     ),
   );
   if (merged === undefined || !Array.isArray(merged.models)) return merged;
@@ -2247,6 +2355,7 @@ export function mergeModelsPayload(
   accountProfile: BridgeAccountContextProfile = "compatibility",
   nativeFamilies?: readonly BridgeNativeModelFamily[],
   nativeRoutesEnabled: boolean | "simple" = true,
+  providerRoutes: readonly WebProviderRoute[] = [],
 ): unknown {
   const record = asRecord(originalProviderPayload);
   if (record === undefined || !Array.isArray(record.models))
@@ -2274,6 +2383,9 @@ export function mergeModelsPayload(
     ),
     ...nativeRoutes.map((route, index) =>
       bridgeModel(template, route, 30 + index, accountProfile),
+    ),
+    ...providerCatalogRoutes(providerRoutes).map((route, index) =>
+      bridgeModel(template, route, 70 + index, "standard"),
     ),
   );
   const capabilities = asRecord(record.bridge_account_capabilities);
@@ -2317,6 +2429,7 @@ export function buildWebOnlyModelsPayload(
   accountProfile: BridgeAccountContextProfile = "compatibility",
   nativeFamilies?: readonly BridgeNativeModelFamily[],
   nativeRoutesEnabled: boolean | "simple" = true,
+  providerRoutes: readonly WebProviderRoute[] = [],
 ): unknown {
   const existing = asRecord(payload);
   // A Web-only snapshot is already compiled against the installed native schema.
@@ -2336,6 +2449,7 @@ export function buildWebOnlyModelsPayload(
             accountProfile,
             nativeFamilies,
             nativeRoutesEnabled,
+            providerRoutes,
           ),
         );
   if (!catalog || !Array.isArray(catalog.models)) {
@@ -2349,7 +2463,18 @@ export function buildWebOnlyModelsPayload(
   );
   const legacyRoutes =
     namedRoutes.length === 0 ? availableBridgeRoutes(availableModes) : [];
-  const rows = [...catalog.models];
+  const providerTemplate = asRecord(catalog.models[0]);
+  const catalogProviderRoutes = providerCatalogRoutes(providerRoutes);
+  // Drop every earlier provider row, including per-thinking-level rows from
+  // catalogs written before levels were grouped.
+  const isProviderRow = (row: unknown): boolean =>
+    modelSlug(row)?.startsWith("gemini-web/") === true;
+  const rows = [
+    ...catalog.models.filter((row) => !isProviderRow(row)),
+    ...catalogProviderRoutes.map((route, index) =>
+      bridgeModel(providerTemplate, route, 70 + index, "standard"),
+    ),
+  ];
   const pro = legacyRoutes.find((route) => route.mode === "pro");
   if (pro && !rows.some((row) => modelSlug(row) === pro.slug)) {
     rows.push(bridgeModel(asRecord(rows[0]), pro, 54, accountProfile));
@@ -2369,6 +2494,10 @@ export function buildWebOnlyModelsPayload(
       : {}),
     models: rows
       .filter((row) => {
+        if (
+          catalogProviderRoutes.some((route) => route.slug === modelSlug(row))
+        )
+          return true;
         const route = bridgeWebModelRoute(modelSlug(row));
         return (
           route !== undefined &&
@@ -2378,6 +2507,10 @@ export function buildWebOnlyModelsPayload(
         );
       })
       .map((row) => {
+        if (
+          catalogProviderRoutes.some((route) => route.slug === modelSlug(row))
+        )
+          return row;
         if (accountProfile === "compatibility") return row;
         const route = bridgeWebModelRoute(modelSlug(row))!;
         const budget = resolveBridgeRouteContextBudget(route, accountProfile);
@@ -2526,14 +2659,21 @@ export class ResponsesGateway {
       bridgeResponseSnapshot(state, result),
       state,
     ).output as JsonRecord[];
+    this.#storeHistory(state.responseId, request, output);
+  }
+  #storeHistory(
+    responseId: string,
+    request: JsonRecord,
+    output: readonly JsonRecord[],
+  ): void {
     const bytes = Buffer.byteLength(JSON.stringify([request, output]));
-    const old = this.#history.get(state.responseId);
+    const old = this.#history.get(responseId);
     if (old) {
       this.#historyBytes -= old.bytes;
-      this.#history.delete(state.responseId);
+      this.#history.delete(responseId);
     }
     if (bytes > MAX_BODY_BYTES) return;
-    this.#history.set(state.responseId, { request, output, bytes });
+    this.#history.set(responseId, { request, output, bytes });
     this.#historyBytes += bytes;
     while (this.#historyBytes > MAX_BODY_BYTES || this.#history.size > 100) {
       const first = this.#history.keys().next().value;
@@ -2647,6 +2787,19 @@ export class ResponsesGateway {
     model: unknown,
     reasoning?: unknown,
   ): Promise<BridgeWebModelRoute | undefined> {
+    const resolved = resolveProviderRoute(
+      await this.#options.providers?.routes(),
+      model,
+      reasoning,
+    );
+    if (resolved) {
+      if ("route" in resolved) return resolved.route;
+      throw new BridgeReasoningEffortError(
+        resolved.slug,
+        resolved.unsupportedEffort,
+        resolved.supported,
+      );
+    }
     const route = bridgeWebModelRoute(model);
     if (route === undefined) return undefined;
     if (route.supportedEfforts) {
@@ -2694,7 +2847,9 @@ export class ResponsesGateway {
       if (!socket.destroyed) socket.destroy();
     });
     server.on("upgrade", (request, socket, head) => {
-      this.#upgrade(request, socket, head);
+      void this.#upgrade(request, socket, head).catch(() =>
+        rejectWebSocketUpgrade(socket, 503, "Service Unavailable"),
+      );
     });
     webSocketServer.on("error", () => undefined);
     this.#server = server;
@@ -2737,7 +2892,11 @@ export class ResponsesGateway {
     });
   }
 
-  #upgrade(request: IncomingMessage, socket: Duplex, head: Buffer): void {
+  async #upgrade(
+    request: IncomingMessage,
+    socket: Duplex,
+    head: Buffer,
+  ): Promise<void> {
     const requestUrl = new URL(request.url ?? "/", "http://127.0.0.1");
     const webOnly = requestUrl.pathname === "/web/v1/responses";
     if (!webOnly && requestUrl.pathname !== "/v1/responses") {
@@ -2756,7 +2915,11 @@ export class ResponsesGateway {
     const hintedModel = routingHintModel(request.headers);
     if (
       hintedModel !== undefined &&
-      bridgeWebModelRoute(hintedModel) === undefined
+      bridgeWebModelRoute(hintedModel) === undefined &&
+      !isKnownProviderModel(
+        await this.#options.providers?.routes(),
+        hintedModel,
+      )
     ) {
       rejectWebSocketUpgrade(socket, 426, "Upgrade Required");
       return;
@@ -2767,11 +2930,15 @@ export class ResponsesGateway {
       return;
     }
     webSocketServer.handleUpgrade(request, socket, head, (webSocket) => {
-      this.#serveBridgeWebSocket(webSocket);
+      this.#serveBridgeWebSocket(webSocket, request.headers, webOnly);
     });
   }
 
-  #serveBridgeWebSocket(webSocket: WebSocket): void {
+  #serveBridgeWebSocket(
+    webSocket: WebSocket,
+    upgradeHeaders: IncomingHttpHeaders,
+    webOnly: boolean,
+  ): void {
     let activeAbortController: AbortController | undefined;
     let messageQueue = Promise.resolve();
     const heartbeat = setInterval(() => {
@@ -2829,11 +2996,40 @@ export class ResponsesGateway {
             throw error;
           }
           try {
-            const knownRoute = bridgeWebModelRoute(record.model);
+            const knownRoute =
+              bridgeWebModelRoute(record.model) ??
+              isKnownProviderModel(
+                await this.#options.providers?.routes(),
+                record.model,
+              );
             const route = await this.#availableBridgeRoute(
               record.model,
               record.reasoning,
             );
+            if (
+              route === undefined &&
+              !knownRoute &&
+              !webOnly &&
+              !isBridgeWebModel(record.model)
+            ) {
+              // Native Codex models (for example gpt-6.1-sol) go to the
+              // original provider, like they already do over HTTP.
+              const abortController = new AbortController();
+              activeAbortController = abortController;
+              try {
+                await this.#forwardNativeWebSocketTurn(
+                  webSocket,
+                  upgradeHeaders,
+                  record,
+                  abortController,
+                );
+              } finally {
+                if (activeAbortController === abortController) {
+                  activeAbortController = undefined;
+                }
+              }
+              return;
+            }
             if (route === undefined) {
               this.#sendWebSocketError(
                 webSocket,
@@ -2915,12 +3111,7 @@ export class ResponsesGateway {
         .catch((error: unknown) => {
           const failure = providerFailure(error);
           this.#sendWebSocketError(webSocket, failure.code, failure.message, {
-            status:
-              failure.retry_after_seconds !== undefined
-                ? 429
-                : failure.type === "invalid_request_error"
-                  ? 400
-                  : 500,
+            status: providerFailureStatus(failure),
             type: failure.type,
             ...(failure.retry_after_seconds === undefined
               ? {}
@@ -2964,6 +3155,194 @@ export class ResponsesGateway {
         sequence_number: 0,
       }),
     );
+  }
+
+  /**
+   * Runs one native-model WebSocket turn through the original provider's
+   * HTTP Responses endpoint and relays its stream events back unchanged.
+   * The upstream HTTP API keeps no connection state, so turns that only send
+   * new input with previous_response_id are rebuilt from local history.
+   */
+  async #forwardNativeWebSocketTurn(
+    webSocket: WebSocket,
+    upgradeHeaders: IncomingHttpHeaders,
+    record: JsonRecord,
+    abortController: AbortController,
+  ): Promise<void> {
+    const event: JsonRecord = { ...record };
+    delete event.type;
+    let request: JsonRecord;
+    try {
+      request = { ...(asRecord(this.#hydrate(event)) ?? event) };
+    } catch (error) {
+      this.#sendWebSocketError(
+        webSocket,
+        "previous_response_not_found",
+        error instanceof Error ? error.message : String(error),
+      );
+      return;
+    }
+    delete request.previous_response_id;
+    const generate = request.generate;
+    delete request.generate;
+
+    if (generate === false) {
+      // Warm-up request: HTTP has no equivalent, so acknowledge it here and
+      // keep the request so the next turn can continue from it.
+      const id = `resp_${randomUUID().replaceAll("-", "")}`;
+      const response = {
+        id,
+        object: "response",
+        created_at: Math.floor(Date.now() / 1000),
+        model: request.model,
+        output: [],
+      };
+      this.#storeHistory(id, request, []);
+      if (webSocket.readyState === WebSocket.OPEN) {
+        webSocket.send(
+          JSON.stringify({
+            type: "response.created",
+            response: { ...response, status: "in_progress" },
+            sequence_number: 0,
+          }),
+        );
+        webSocket.send(
+          JSON.stringify({
+            type: "response.completed",
+            response: { ...response, status: "completed" },
+            sequence_number: 1,
+          }),
+        );
+      }
+      return;
+    }
+
+    const headers = sanitizedHeaders(upgradeHeaders, true);
+    for (const key of [...headers.keys()]) {
+      if (key === "upgrade" || key.startsWith("sec-websocket-"))
+        headers.delete(key);
+    }
+    const beta = headers.get("openai-beta");
+    if (beta !== null && /websocket/iu.test(beta))
+      headers.delete("openai-beta");
+    headers.set("content-type", "application/json");
+    headers.set("accept", "text/event-stream");
+
+    const fetchImpl = this.#options.fetchImpl ?? fetch;
+    const turnLease = this.#ownTurn(record, abortController);
+    let terminal = false;
+    try {
+      const upstream = await fetchImpl(
+        `${await this.#originalProviderBaseUrl()}/responses`,
+        {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ ...request, stream: true }),
+          redirect: "manual",
+          signal: abortController.signal,
+        },
+      );
+      if (!upstream.ok || upstream.body === null) {
+        const text = await upstream.text().catch(() => "");
+        let error: JsonRecord | undefined;
+        try {
+          error = asRecord(asRecord(JSON.parse(text) as unknown)?.error);
+        } catch {
+          error = undefined;
+        }
+        terminal = true;
+        this.#sendWebSocketError(
+          webSocket,
+          typeof error?.code === "string"
+            ? error.code
+            : `upstream_http_${upstream.status}`,
+          typeof error?.message === "string"
+            ? error.message
+            : text.slice(0, 500) ||
+                `Original provider returned HTTP ${upstream.status}.`,
+          {
+            status: upstream.status,
+            ...(typeof error?.type === "string" ? { type: error.type } : {}),
+          },
+        );
+        return;
+      }
+
+      let responseId: string | undefined;
+      let completed = false;
+      const output: JsonRecord[] = [];
+      const relay = (block: string): void => {
+        const data = block
+          .split(/\r?\n/u)
+          .filter((line) => line.startsWith("data:"))
+          .map((line) => line.slice(5).replace(/^ /u, ""))
+          .join("\n");
+        if (data === "" || data === "[DONE]") return;
+        let payload: JsonRecord | undefined;
+        try {
+          payload = asRecord(JSON.parse(data) as unknown);
+        } catch {
+          return;
+        }
+        if (!payload) return;
+        if (webSocket.readyState === WebSocket.OPEN) webSocket.send(data);
+        const response = asRecord(payload.response);
+        if (typeof response?.id === "string") responseId = response.id;
+        if (payload.type === "response.output_item.done") {
+          const item = asRecord(payload.item);
+          if (item) output.push(item);
+        }
+        if (payload.type === "response.completed") completed = true;
+        if (
+          payload.type === "response.completed" ||
+          payload.type === "response.failed" ||
+          payload.type === "response.incomplete" ||
+          payload.type === "error"
+        ) {
+          terminal = true;
+        }
+      };
+
+      const reader = upstream.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      try {
+        while (true) {
+          const chunk = await reader.read();
+          if (chunk.done) break;
+          buffer += decoder.decode(chunk.value, { stream: true });
+          const blocks = buffer.split(/\r?\n\r?\n/u);
+          buffer = blocks.pop() ?? "";
+          for (const block of blocks) relay(block);
+        }
+        buffer += decoder.decode();
+        if (buffer.trim() !== "") relay(buffer);
+      } finally {
+        reader.releaseLock();
+      }
+      if (completed && responseId !== undefined) {
+        this.#storeHistory(responseId, request, output);
+      }
+    } catch (error) {
+      if (abortController.signal.aborted) return;
+      terminal = true;
+      this.#sendWebSocketError(
+        webSocket,
+        "upstream_unavailable",
+        error instanceof Error ? error.message : String(error),
+        { status: 502, type: "server_error" },
+      );
+    } finally {
+      turnLease.release();
+      if (!terminal && !abortController.signal.aborted) {
+        this.#sendWebSocketError(
+          webSocket,
+          "upstream_stream_incomplete",
+          "Original provider closed the stream before the response finished.",
+          { status: 502, type: "server_error" },
+        );
+      }
+    }
   }
 
   async #handleAdmin(
@@ -3162,6 +3541,7 @@ export class ResponsesGateway {
               (await this.#options.fullMcp?.enabled()) === true
                 ? true
                 : "simple",
+              await this.#options.providers?.routes(),
             ),
           );
           return;
@@ -3189,7 +3569,12 @@ export class ResponsesGateway {
         };
       }
       const record = asRecord(parsed);
-      const knownBridgeRoute = bridgeWebModelRoute(record?.model);
+      const knownBridgeRoute =
+        bridgeWebModelRoute(record?.model) ??
+        isKnownProviderModel(
+          await this.#options.providers?.routes(),
+          record?.model,
+        );
       const availableBridgeRoute = await this.#availableBridgeRoute(
         record?.model,
         record?.reasoning,
@@ -3400,17 +3785,9 @@ export class ResponsesGateway {
       const failure = providerFailure(error);
       if (failure.retry_after_seconds !== undefined)
         response.setHeader("Retry-After", String(failure.retry_after_seconds));
-      json(
-        response,
-        failure.retry_after_seconds !== undefined
-          ? 429
-          : failure.type === "invalid_request_error"
-            ? 400
-            : 500,
-        {
-          error: failure,
-        },
-      );
+      json(response, providerFailureStatus(failure), {
+        error: failure,
+      });
     } finally {
       lifecycleLease?.release();
     }
@@ -3457,6 +3834,7 @@ export class ResponsesGateway {
         await this.#options.accountContextProfile?.(),
         await this.#options.nativeModelFamilies?.(),
         (await this.#options.fullMcp?.enabled()) === true ? true : "simple",
+        await this.#options.providers?.routes(),
       ),
     );
   }

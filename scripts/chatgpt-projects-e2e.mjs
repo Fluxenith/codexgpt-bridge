@@ -45,6 +45,7 @@ let listRequests = 0;
 let searchMode = "controlled";
 let projectLocale = "zh-TW";
 let directoryLayout = "legacy";
+let loadingRequests = 0;
 const directoryPage = () => `<!doctype html><main>
   <h1>Projects</h1><input id="${searchMode === "missing-control" ? "unsupported-search" : directoryLayout === "index" ? "projects-index-search" : "projects-page-search"}" aria-label="Search projects" value="">
   <button id="new-project">${directoryLayout === "index" ? "Create" : projectLocale === "zh-TW" ? "新增" : "New"}</button><div id="results"></div>
@@ -55,10 +56,12 @@ const directoryPage = () => `<!doctype html><main>
   const results = document.querySelector('#results');
   const mode = ${JSON.stringify(searchMode)};
   const layout = ${JSON.stringify(directoryLayout)};
+  const stuckLoading = ${JSON.stringify((searchMode === "loading-recover" && loadingRequests++ === 0) || searchMode === "loading-forever")};
   const hydratedAt = Date.now() + (mode === 'late-hydration' ? 2400 : 0);
   let query = '', timer;
   function render() {
     results.replaceChildren();
+    if (stuckLoading) { results.innerHTML='<p>正在載入專案</p>'; return; }
     const matches = projects.filter(p=>p.name.toLowerCase().includes(query.toLowerCase()));
     if (!matches.length) { const empty=document.createElement('p'); empty.textContent=${JSON.stringify(directoryLayout === "index" ? "No projects" : projectLocale === "zh-TW" ? "沒有符合的專案" : "No matching projects")};results.append(empty); }
     for (const p of matches) {
@@ -297,7 +300,7 @@ try {
   );
   searchMode = "stale-results";
   assert.match(
-    (await autoRun("auto-stale-results", "Never create")).error,
+    (await autoRun("auto-stale-results", "Never create", 55_000)).error,
     /搜尋結果尚未更新/,
   );
   searchMode = "controlled";
@@ -379,6 +382,21 @@ try {
   assert.match(missingControl.error, /專案搜尋欄位未就緒/);
   assert.equal(missingControl.diagnosticCode, "timeout");
   assert.equal(sends.length, sendsBeforeIndexErrors);
+  assert.deepEqual(creates, [autoName, "Uncertain", indexName]);
+  searchMode = "loading-recover";
+  loadingRequests = 0;
+  assert.deepEqual(await autoRun("loading-recover", "Existing", 55_000), {
+    output: "PROJECT_OK",
+  });
+  assert.equal(loadingRequests, 2);
+  assert.equal(sends.at(-1).start, "/g/g-p-existing/project");
+  const sendsBeforeLoading = sends.length;
+  searchMode = "loading-forever";
+  const stuck = await autoRun("loading-forever", "Never create", 55_000);
+  assert.match(stuck.error, /搜尋結果尚未更新/);
+  assert.equal(stuck.diagnosticCode, "timeout");
+  assert.match(stuck.error, /"busy":true/);
+  assert.equal(sends.length, sendsBeforeLoading);
   assert.deepEqual(creates, [autoName, "Uncertain", indexName]);
   process.stdout.write(
     "Projects E2E passed: legacy and index layouts, native controlled input, delayed results/hydration, mappings, isolation, rebuild, reuse/create, concurrent deduplication, duplicates, partial matches, expired session, uncertain-create restart recovery, missing-control timeout diagnostics and zero-send failures.\n",

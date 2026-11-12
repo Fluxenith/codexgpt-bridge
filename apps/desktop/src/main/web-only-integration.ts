@@ -174,7 +174,11 @@ export function restoreWebOnlyConfig(text: string, plan: WebOnlyPlan): string {
   const currentHeader = text.slice(start, end + END.length + ending.length);
   const normalized = currentHeader
     .replace(/^model = "([^"]+)"$/mu, (line, model: string) => {
-      if (!CODEXGPT_BRIDGE_ALL_WEB_MODEL_IDS.includes(model)) return line;
+      if (
+        !CODEXGPT_BRIDGE_ALL_WEB_MODEL_IDS.includes(model) &&
+        !/^gemini-web\/[A-Za-z0-9/_-]+$/u.test(model)
+      )
+        return line;
       return 'model = "codexgpt-bridge/high"';
     })
     .replace(

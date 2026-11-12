@@ -16,6 +16,20 @@ Bridge 支援每個任務獨立對話、圖片、進度顯示與取消。
 
 **v0.1.103：** Full MCP 的官方 Tunnel 程式可自動下載並驗證，路徑留白即可。Tunnel ID、Runtime API key 與外掛權限仍需設定。
 
+## 最新原始碼改動（尚未發版）
+
+- **實驗性 Gemini Web：** 登入後探索帳號可用的模型與思考等級，並加入 Codex；
+  Simple 與 Full MCP 使用獨立的 Gemini 任務佇列。需要登入或驗證時才顯示 Gemini 視窗，也可手動開啟。
+- **原生模型相容性：** 原生 Codex 模型的 Responses WebSocket 請求會轉送至原本的供應商，
+  保留對話歷史與上游錯誤。
+- **ChatGPT 穩定性：** 改善專案載入判斷與圖片附件辨識；
+  暫時聊天無法使用指定的 Full MCP 外掛時，提供明確處理方式。
+- **Full MCP 與 Windows：** 工具結果確認送達前持續保留待處理狀態，重用未變更的工具清單，
+  並在儲存 JSON 時重試 Windows 暫時檔案鎖定。
+
+上述改動位於原始碼分支；上方下載連結仍指向最新已發布版本。
+Gemini 的設定與目前限制請見下方「Gemini Web（實驗功能）」。
+
 ## 觀看實際示範
 
 ![CodexGPT Bridge：實際修正程式並通過測試](assets/launch/demo-preview-en.gif)
@@ -213,6 +227,26 @@ Bridge 還在早期階段。如果你願意試用，歡迎
 pnpm install --frozen-lockfile
 pnpm desktop
 ```
+
+## Gemini Web（實驗功能）
+
+Bridge 也能把已登入的 Gemini 網頁版帳號接到 Codex，使用你 Gemini 網頁版的
+帳號與額度，不需要 API key。
+
+1. 在 Bridge 打開 **Gemini** 頁面，按 **啟用 Gemini Web**。
+2. 按 **開啟 Gemini 登入**，在 Bridge 內建的 Gemini 瀏覽器登入，不必關閉瀏覽器。
+3. 按 **繼續並探索模型**，找出你帳號可用的模型與思考等級。
+4. 按 **將 Gemini 模型加入 Codex**，重新啟動 Codex，選擇 `gemini-web/` 開頭的模型。
+
+Simple 模式不需要額外設定。Full MCP 另外需要固定的公開 HTTPS 網址，並在
+Gemini 英文介面連接自訂應用程式。
+
+目前 Gemini 支援文字與 Codex 工具；附件、媒體、Canvas、深度研究、筆記本與子代理
+尚未支援。Gemini 發生錯誤時，Bridge 不會自動重送請求。
+
+Bridge 會自動操作已登入的 Gemini 網頁，介面變動可能影響運作。使用前請先閱讀
+Google 的[服務條款](https://policies.google.com/terms)與 Gemini 相關政策；
+此整合方式可能與其衝突。
 
 ## 第三方授權
 

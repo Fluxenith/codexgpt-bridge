@@ -13,6 +13,20 @@ GPT 插件与 Full MCP 设置教程：[繁體中文](README.zh-TW.md#chatgpt-外
 
 **v0.1.103：** Full MCP 可自动下载并验证官方 Tunnel 程序，路径留空即可；Tunnel 凭据和插件权限仍需设置。
 
+## 最新源码改动（尚未发布）
+
+- **实验性 Gemini Web：** 登录后发现账号可用的模型与思考等级，并加入 Codex；
+  Simple 与 Full MCP 使用独立的 Gemini 任务队列。需要登录或验证时才显示 Gemini 窗口，也可手动打开。
+- **原生模型兼容性：** 原生 Codex 模型的 Responses WebSocket 请求会转发至原本的提供商，
+  保留对话历史与上游错误。
+- **ChatGPT 稳定性：** 改善项目加载判断与图片附件识别；
+  临时聊天无法使用指定的 Full MCP 插件时，提供明确处理方式。
+- **Full MCP 与 Windows：** 工具结果确认送达前保持待处理状态，复用未变更的工具列表，
+  并在保存 JSON 时重试 Windows 临时文件锁定。
+
+上述改动位于源码分支；下载链接仍指向最新已发布版本。
+Gemini 的设置与当前限制请参阅下方“Gemini Web（实验功能）”。
+
 ## 安装
 
 从本仓库的 **[Releases](https://github.com/Fluxenith/codexgpt-bridge/releases/latest)** 页面下载适合你的操作系统的安装包。
@@ -60,6 +74,26 @@ Bridge 会在启动和后台运行时检查新版本。在线更新需要可访�
 pnpm install --frozen-lockfile
 pnpm desktop
 ```
+
+## Gemini Web（实验功能）
+
+Bridge 也能把已登录的 Gemini 网页版账号接入 Codex，使用你 Gemini 网页版的账号与额度，
+不需要 API key。
+
+1. 在 Bridge 打开 **Gemini** 页面，点击 **启用 Gemini Web**。
+2. 点击 **打开 Gemini 登录**，在 Bridge 内置的 Gemini 浏览器登录，无需关闭浏览器。
+3. 点击 **继续并发现模型**，找出你账号可用的模型与思考等级。
+4. 点击 **将 Gemini 模型添加到 Codex**，重新启动 Codex，选择 `gemini-web/` 开头的模型。
+
+Simple 模式无需额外设置。Full MCP 还需要固定的公开 HTTPS 地址，并在 Gemini
+英文界面连接自定义应用。
+
+目前 Gemini 支持文本与 Codex 工具；附件、媒体、Canvas、深度研究、笔记本与子代理
+尚未支持。Gemini 出错时，Bridge 不会自动重新发送请求。
+
+Bridge 会自动操作已登录的 Gemini 网页，界面变化可能影响运行。使用前请先阅读
+Google 的[服务条款](https://policies.google.com/terms)与 Gemini 相关政策；
+此集成方式可能与其冲突。
 
 ## 第三方许可
 

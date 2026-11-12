@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { GeminiPanel } from "./GeminiPanel.js";
 import type {
   DesktopDoctorReport,
   DesktopSettings,
@@ -80,6 +81,9 @@ const EMPTY_PROVIDER: WebProviderStatus = {
 };
 
 export function App() {
+  const [activeProvider, setActiveProvider] = useState<"chatgpt" | "gemini">(
+    "chatgpt",
+  );
   const [settings, setSettings] = useState<DesktopSettings>(EMPTY_SETTINGS);
   const [webProvider, setWebProvider] =
     useState<WebProviderStatus>(EMPTY_PROVIDER);
@@ -241,7 +245,43 @@ export function App() {
           </section>
         )}
 
-      <section className="card providerCard">
+      <div
+        className="providerSwitch"
+        role="group"
+        aria-label={t("webProviderSelect")}
+      >
+        <button
+          className="secondary"
+          aria-pressed={activeProvider === "chatgpt"}
+          onClick={() => setActiveProvider("chatgpt")}
+        >
+          ChatGPT
+        </button>
+        <button
+          className="secondary"
+          aria-pressed={activeProvider === "gemini"}
+          onClick={() => setActiveProvider("gemini")}
+        >
+          Gemini
+        </button>
+      </div>
+      {activeProvider === "gemini" && (
+        <GeminiPanel
+          status={webProvider.gemini}
+          t={t}
+          busy={busy}
+          run={run}
+          onMessage={setMessage}
+          onProviderChange={setWebProvider}
+          onChange={(gemini) =>
+            setWebProvider((before) => ({ ...before, gemini }))
+          }
+        />
+      )}
+      <section
+        className="card providerCard"
+        hidden={activeProvider !== "chatgpt"}
+      >
         <div className="sectionHeading">
           <div>
             <p className="eyebrow">{t("providerHeading")}</p>
@@ -1216,7 +1256,6 @@ export function App() {
           </div>
         ))}
       </section>
-
       <section className="card maintenanceCard" id="bridge-updates">
         <div className="sectionHeading">
           <div>

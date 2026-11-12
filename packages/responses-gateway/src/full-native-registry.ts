@@ -1,5 +1,26 @@
 import type { FullTurnBroker, FullTurnToolResult } from "./full-turn-broker.js";
+import { createHash } from "node:crypto";
 import type { BridgeToolDefinition } from "./tool-protocol.js";
+
+/** Short, stable identity of the advertised tool list. The model can reuse
+ * schemas it already received for the same fingerprint instead of listing
+ * every tool again at the start of each Codex request. */
+export function toolInventoryFingerprint(
+  tools: readonly BridgeToolDefinition[],
+): string {
+  const rows = [...tools]
+    .map((tool) => [
+      tool.wireName,
+      tool.kind,
+      tool.description,
+      tool.parameters,
+    ])
+    .sort((a, b) => String(a[0]).localeCompare(String(b[0])));
+  return createHash("sha256")
+    .update(JSON.stringify(rows))
+    .digest("hex")
+    .slice(0, 12);
+}
 import {
   assertFullAgentWait,
   FULL_AGENT_WAIT_POLL_MS,
@@ -207,6 +228,7 @@ export class FullNativeRegistry {
       tools,
       total,
       nextOffset: start + tools.length < total ? start + tools.length : null,
+      inventory_fingerprint: toolInventoryFingerprint(outer),
     };
   }
 
@@ -253,6 +275,11 @@ export class FullNativeRegistry {
       });
     }
     const gateway = gatewayTool(outer);
+    // Each Codex request has a new token. Rather than making the model spend a
+    // whole step re-listing tools, look up this exact name in the live native
+    // registry; the call still proceeds only if the tool exists right now.
+    if (gateway && !this.#discovered.get(token)?.has(name))
+      await this.inventory(token, name, 0, 100, signal).catch(() => undefined);
     if (!gateway || !this.#discovered.get(token)?.has(name))
       throw new Error(
         `Discover the exact native tool ${name} with codex_tool_inventory before calling it.`,

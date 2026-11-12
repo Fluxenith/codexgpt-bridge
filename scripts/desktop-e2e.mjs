@@ -342,7 +342,7 @@ function fakeChatGptHtml(nativeToolSelected = false) {
           const message = document.createElement('div');
           message.setAttribute('data-message-author-role', 'assistant');
           message.setAttribute('data-message-id', responseId);
-          const imageAttached = Boolean(document.querySelector('.composer-attachment-surface[aria-label="codex-input-image-1.png"]'));
+          const imageAttached = Boolean(document.querySelector('.composer-attachment-surface[aria-label^="codex-input-image-1-"][aria-label$=".png"]'));
           const bridgeClientTool = prompt.includes('custom_client__open_workspace');
           const transientImageFailure = prompt.includes('provider-transient-image-failure-e2e');
           const transientImageRetry = window.__providerPendingImageRetry
@@ -739,19 +739,19 @@ try {
   const language = page.locator(".languagePicker select");
   await language.waitFor();
   await language.selectOption("zh-TW");
-  await waitForText(page, "把 ChatGPT Web 模型帶進 Codex。");
+  await waitForText(page, "把 ChatGPT 與 Gemini 網頁版模型帶進 Codex。");
   await language.selectOption("zh-CN");
-  await waitForText(page, "把 ChatGPT Web 模型带进 Codex。");
+  await waitForText(page, "把 ChatGPT 和 Gemini 网页版模型带进 Codex。");
   await waitForText(
     page,
     "请登录 ChatGPT、安装 Web 模型，再重启 Codex；不需要设置文件夹。",
   );
   await page.reload();
-  await waitForText(page, "把 ChatGPT Web 模型带进 Codex。");
+  await waitForText(page, "把 ChatGPT 和 Gemini 网页版模型带进 Codex。");
   assert.equal(await language.inputValue(), "zh-CN");
   assert.equal(await page.locator("html").getAttribute("lang"), "zh-CN");
   await language.selectOption("en");
-  await waitForText(page, "Bring ChatGPT Web models into Codex.");
+  await waitForText(page, "Bring ChatGPT and Gemini Web models into Codex.");
   const temporaryToggle = page.getByLabel("Use Temporary Chat for new tasks", {
     exact: true,
   });

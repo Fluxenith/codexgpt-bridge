@@ -52,10 +52,16 @@ export function composerModelControlTarget(
         ].join(" "),
       ),
   );
-  const dedicated = buttons.filter((button) =>
-    /^(?:model-switcher-dropdown-button|composer-model-picker-button)$/.test(
-      button.getAttribute("data-testid") || "",
-    ),
+  // 2026-10-29: the inline trigger has a localized label and no test ID, but
+  // keeps these language-independent attributes.
+  const dedicated = buttons.filter(
+    (button) =>
+      /^(?:model-switcher-dropdown-button|composer-model-picker-button)$/.test(
+        button.getAttribute("data-testid") || "",
+      ) ||
+      button.matches(
+        '[data-composer-navigation-target="reasoning"][data-selected-reasoning-effort][aria-haspopup="menu"]',
+      ),
   );
   const candidates = dedicated.length
     ? dedicated

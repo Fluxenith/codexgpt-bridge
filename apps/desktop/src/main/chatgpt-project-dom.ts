@@ -58,9 +58,18 @@ export function chatGptProjectAction(
       "#projects-page-search, #projects-index-search",
     ),
   ].find(visible);
-  const busy = [
-    ...main.querySelectorAll('[aria-busy="true"], [role="progressbar"]'),
-  ].some(visible);
+  const loadingText = [...main.querySelectorAll("p, div, span")].some(
+    (el) =>
+      visible(el) &&
+      /^(Loading projects|正在載入專案|正在加载项目|正在載入專案中|載入專案中)[.…。]*$/i.test(
+        text(el),
+      ),
+  );
+  const busy =
+    loadingText ||
+    [...main.querySelectorAll('[aria-busy="true"], [role="progressbar"]')].some(
+      visible,
+    );
   const rows = [
     ...main.querySelectorAll<HTMLElement>(
       '[role="row"][data-page-table-selectable-row], [data-project-row="true"]',

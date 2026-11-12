@@ -5053,6 +5053,19 @@ class ChatGptBrowserSession {
       await delay(250 * attempt, signal);
     }
 
+    // Temporary Chat can filter custom Apps even when the same account offers
+    // them in regular chats. Reloading cannot resolve that conversation policy.
+    // Check the rendered header after exhausting selection attempts; do not
+    // reject Temporary Chats that actually offer the App or change privacy mode.
+    const temporary = this.#temporaryChat
+      ? await this.#observeTemporaryChat(window)
+      : undefined;
+    if (temporary?.active && !temporary.ambiguous) {
+      throw new PreparationError(
+        `ChatGPT did not offer the exact Full MCP connector ${JSON.stringify(connectorName)} in this Temporary Chat after ${maxAttempts} ${maxAttempts === 1 ? "attempt" : "attempts"}. Turn off Temporary Chat in Bridge to use a regular conversation (saved in ChatGPT history), or keep Temporary Chat and choose Simple. No setting was changed and no prompt was submitted.`,
+        "full-mcp-temporary-connector-unavailable",
+      );
+    }
     const catalog = visibleTitles.length
       ? " The picker opened, but did not expose that App."
       : " The App picker did not expose any rows.";
@@ -5152,7 +5165,17 @@ class ChatGptBrowserSession {
     images: RunWebTurnInput["images"],
     signal: AbortSignal,
   ): Promise<void> {
-    const files = chatGptImageFiles(images);
+    // ChatGPT can rename an uploaded file to name(1).png when an earlier
+    // turn used the same name. Give each batch its own identity as well as
+    // accepting that server-side suffix below.
+    const uploadId = randomUUID();
+    const files = chatGptImageFiles(images).map((file) => {
+      const extensionAt = file.name.lastIndexOf(".");
+      return {
+        ...file,
+        name: `${file.name.slice(0, extensionAt)}-${uploadId}${file.name.slice(extensionAt)}`,
+      };
+    });
     if (files.length === 0) return;
     const serialized = JSON.stringify(files);
     const accepted = await this.#execute<{
@@ -5195,6 +5218,7 @@ class ChatGptBrowserSession {
     const expectedNames = files.map((file) => file.name);
     const expectedNamesJson = JSON.stringify(expectedNames);
     const deadline = Date.now() + 60_000;
+    let lastState;
     while (Date.now() < deadline) {
       if (signal.aborted) {
         throw new DOMException("Provider turn was cancelled.", "AbortError");
@@ -5202,6 +5226,9 @@ class ChatGptBrowserSession {
       const state = await this.#execute<{
         readonly ready: boolean;
         readonly error: string;
+        readonly matchedCount: number;
+        readonly uploading: boolean;
+        readonly sendReady: boolean;
       }>(
         window,
         "wait-for-images",
@@ -5225,9 +5252,18 @@ class ChatGptBrowserSession {
               || labelled
               || (element.getAttribute('role') === 'group' ? (element.textContent || '').trim() : '');
           };
-          const attached = expectedNames.every((name) =>
-            candidates.some((candidate) => candidateName(candidate) === name)
-          );
+          const matchesName = (actual, expected) => {
+            if (actual === expected) return true;
+            const extensionAt = expected.lastIndexOf('.');
+            const stem = expected.slice(0, extensionAt);
+            const extension = expected.slice(extensionAt);
+            return actual.startsWith(stem) && actual.endsWith(extension)
+              && /^ ?\\([1-9]\\d*\\)$/.test(actual.slice(stem.length, -extension.length));
+          };
+          const matchedCount = expectedNames.filter((name) =>
+            candidates.some((candidate) => matchesName(candidateName(candidate), name))
+          ).length;
+          const attached = matchedCount === expectedNames.length;
           const uploading = form.querySelector(
             '[aria-busy="true"], [role="progressbar"], [data-inline-file-uploading]'
           ) !== null;
@@ -5239,9 +5275,10 @@ class ChatGptBrowserSession {
             .filter(visible)
             .map((element) => (element.textContent || '').trim())
             .filter(Boolean);
-          return { ready: attached && !uploading && sendReady, error: alerts.join(' | ') };
+          return { ready: attached && !uploading && sendReady, error: alerts.join(' | '), matchedCount, uploading, sendReady };
         })()`,
       );
+      lastState = state;
       if (state.error.length > 0) {
         throw new Error(
           `ChatGPT did not accept the input image: ${state.error}`,
@@ -5251,7 +5288,7 @@ class ChatGptBrowserSession {
       await delay(100, signal);
     }
     throw new Error(
-      "ChatGPT accepted the image upload event but did not finish attaching it within 60 seconds.",
+      `ChatGPT accepted the image upload event but did not finish attaching it within 60 seconds (matched ${lastState?.matchedCount ?? 0}/${files.length} images, uploading: ${lastState?.uploading ?? "unknown"}, send ready: ${lastState?.sendReady ?? "unknown"}).`,
     );
   }
 

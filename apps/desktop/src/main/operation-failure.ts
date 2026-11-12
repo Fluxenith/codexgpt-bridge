@@ -18,6 +18,7 @@ const PREPARATION_FAILURES = new Set<PreparationFailureCode>([
   "model-selection-disabled",
   "model-selection-mismatch",
   "full-mcp-connector-unavailable",
+  "full-mcp-temporary-connector-unavailable",
   "native-tool-selection-active",
 ]);
 
@@ -166,7 +167,14 @@ const RECOVERY: Readonly<Record<OperationFailureCode, OperationRecovery>> = {
   "full-mcp-connector-unavailable": {
     title: "Full MCP app unavailable",
     instruction:
-      "Full MCP currently requires ChatGPT Business, Enterprise, or Edu and an enabled custom app with the exact configured name. Create or enable that app, or choose Simple for a new turn.",
+      "Check that ChatGPT offers an enabled app with the exact configured name in this conversation, or choose Simple for a new turn.",
+    action: "open-task",
+    automatic: false,
+  },
+  "full-mcp-temporary-connector-unavailable": {
+    title: "Full MCP app unavailable in Temporary Chat",
+    instruction:
+      "ChatGPT did not offer the configured app in this Temporary Chat. Turn off Temporary Chat in Bridge to use a regular conversation (saved in ChatGPT history), or keep Temporary Chat and choose Simple. Bridge has not changed either setting or submitted a message.",
     action: "open-task",
     automatic: false,
   },
