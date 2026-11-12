@@ -19,6 +19,21 @@ This is an independent third-party project, unaffiliated with OpenAI.
 automatically. Leave the client path blank; Tunnel credentials and plugin
 permissions are still required.
 
+## Latest source changes (unreleased)
+
+- **Experimental Gemini Web:** sign in, discover account-available models and thinking levels,
+  and add them to Codex. Simple and Full MCP use a separate Gemini task queue.
+  The Gemini window appears when sign-in or verification needs attention and can be opened manually.
+- **Native model compatibility:** Responses WebSocket requests for native Codex models now
+  reach the original provider, with conversation history and upstream errors preserved.
+- **ChatGPT reliability:** improve project-loading detection and image attachment matching,
+  and explain when Temporary Chat does not offer the configured Full MCP app.
+- **Full MCP and Windows:** keep tool results pending until delivery is acknowledged,
+  reuse unchanged tool inventories, and retry temporary Windows file locks during JSON saves.
+
+These changes are in the source branch; the download links above still point to the latest
+published release. See [Gemini Web setup and current limits](#gemini-web-experimental).
+
 ## See Bridge in action
 
 ![CodexGPT Bridge: a real code fix and passing tests](assets/launch/demo-preview-en.gif)

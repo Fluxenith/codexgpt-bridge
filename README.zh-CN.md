@@ -13,6 +13,20 @@ GPT 插件与 Full MCP 设置教程：[繁體中文](README.zh-TW.md#chatgpt-外
 
 **v0.1.103：** Full MCP 可自动下载并验证官方 Tunnel 程序，路径留空即可；Tunnel 凭据和插件权限仍需设置。
 
+## 最新源码改动（尚未发布）
+
+- **实验性 Gemini Web：** 登录后发现账号可用的模型与思考等级，并加入 Codex；
+  Simple 与 Full MCP 使用独立的 Gemini 任务队列。需要登录或验证时才显示 Gemini 窗口，也可手动打开。
+- **原生模型兼容性：** 原生 Codex 模型的 Responses WebSocket 请求会转发至原本的提供商，
+  保留对话历史与上游错误。
+- **ChatGPT 稳定性：** 改善项目加载判断与图片附件识别；
+  临时聊天无法使用指定的 Full MCP 插件时，提供明确处理方式。
+- **Full MCP 与 Windows：** 工具结果确认送达前保持待处理状态，复用未变更的工具列表，
+  并在保存 JSON 时重试 Windows 临时文件锁定。
+
+上述改动位于源码分支；下载链接仍指向最新已发布版本。
+Gemini 的设置与当前限制请参阅下方“Gemini Web（实验功能）”。
+
 ## 安装
 
 从本仓库的 **[Releases](https://github.com/Fluxenith/codexgpt-bridge/releases/latest)** 页面下载适合你的操作系统的安装包。
